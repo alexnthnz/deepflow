@@ -15,8 +15,8 @@ class ChatRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_chat(self, title: str = None) -> Chat:
-        chat = Chat(id=uuid.uuid4(), title=title)
+    def create_chat(self, title: str = None, session_id: uuid.UUID = None) -> Chat:
+        chat = Chat(id=session_id, title=title)
         self.db.add(chat)
         self.db.commit()
         self.db.refresh(chat)

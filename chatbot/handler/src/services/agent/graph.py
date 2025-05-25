@@ -1,16 +1,17 @@
 import logging
-from typing import Optional, List, Tuple, Sequence
+from typing import Optional, List, Tuple
 
-from langchain_core.messages import ToolMessage, HumanMessage, SystemMessage, AIMessage, AnyMessage
+from langchain_core.messages import ToolMessage, HumanMessage, SystemMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_postgres import PostgresChatMessageHistory
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, END, START
+from langgraph.types import Command
 
 from database import database
 
 from .llm import llm
 from .tools import TOOLS
-from .state import InputState, State
+from .state import State
 from .utils import format_response_message, format_tool_message
 
 logger = logging.getLogger(__name__)
@@ -26,10 +27,10 @@ class Graph:
             sync_connection=database.sync_connection,
         )
         self.model = llm.bind_tools(TOOLS)
-        workflow = StateGraph(State, input=InputState)
+        workflow = StateGraph(State)
+        workflow.add_edge(START, "llm")
         workflow.add_node("llm", self.__call_model)
         workflow.add_node("tools", self.__call_tools)
-        workflow.set_entry_point("llm")
         workflow.add_conditional_edges(
             "llm",
             self.__should_continue,
@@ -43,10 +44,11 @@ class Graph:
 
     def __call_model(self, state: State, config: RunnableConfig):
         response = self.model.invoke(state["messages"], config)
-        title = state.get("title", None)
-        if not title or len(state["messages"]) > 1:
-            title = self.__generate_title(state["messages"])
-        return {"messages": [response], "title": title, "is_last_step": state["is_last_step"]}
+        return Command(
+            update={
+                "messages": [response]
+            }
+        )
 
     @staticmethod
     def __call_tools(state: State):
@@ -86,7 +88,12 @@ class Graph:
                         tool_call_id=tool_call["id"],
                     )
                 )
-        return {"messages": outputs, "is_last_step": state["is_last_step"], "title": state.get("title", None)}
+        return Command(
+            update={
+                "messages": outputs,
+                "is_last_step": state["is_last_step"],
+            }
+        )
 
     @staticmethod
     def __should_continue(state: State):
@@ -94,37 +101,6 @@ class Graph:
         if not messages[-1].tool_calls:
             return "end"
         return "continue"
-
-    def __generate_title(self, messages: Sequence[AnyMessage]) -> str:
-        """
-        Generate a concise title for the conversation based on the message history.
-        """
-        if not messages:
-            return "New Conversation"
-
-        # Extract content from messages, limiting to the last 10 for context
-        context = ""
-        for msg in messages[-10:]:
-            if isinstance(msg, (HumanMessage, AIMessage)):
-                context += f"{msg.content}\n"
-            elif isinstance(msg, ToolMessage):
-                context += f"Tool response: {msg.content}\n"
-
-        # Prompt the LLM to generate a title
-        prompt = (
-            "Based on the following conversation context, generate a concise title (5-10 words) that summarizes the main topic or intent:\n\n"
-            f"{context}\n\nTitle:"
-        )
-        try:
-            response = self.model.invoke([SystemMessage(content=prompt)])
-            title = response.content.strip()
-            # Ensure title is concise and clean
-            if len(title) > 50:
-                title = title[:47] + "..."
-            return title if title else "Untitled Conversation"
-        except Exception as e:
-            logger.error(f"Error generating title: {e}")
-            return "Untitled Conversation"
 
     async def get_message(
         self, question: str, attachments: Optional[List[dict]] = None
@@ -220,14 +196,12 @@ class Graph:
                 if message not in old_context_messages
             ]
 
-            title = result.get("title", "Untitled Conversation")
-
             self.conversation_history.add_messages(filtered_messages)
 
             message, resources, images = format_response_message(filtered_messages)
 
-            return message, resources, images, title
+            return message, resources, images, "Untitled Conversation"
 
         except Exception as e:
-            logger.error(f"Error processing message: {e}")
+            logger.error(f"Error processing message: {e}", exc_info=True)
             return f"Error: Failed to process message: {str(e)}", [], [], "Error Conversation"

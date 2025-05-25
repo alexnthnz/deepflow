@@ -23,31 +23,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/", response_model=CommonResponse, status_code=status.HTTP_201_CREATED)
-async def create_chat(
-    chat: ChatCreate,
-    chat_repo: ChatRepository = Depends(get_chat_repository),
-):
-    try:
-        db_chat = chat_repo.create_chat(title=chat.title)
-        return CommonResponse(
-            message="Chat created successfully",
-            status_code=status.HTTP_201_CREATED,
-            data=ChatInDB.from_orm(db_chat).dict(),
-            error=None,
-        )
-    except Exception as e:
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=CommonResponse(
-                message="Failed to create chat",
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                data=None,
-                error=str(e),
-            ).dict(),
-        )
-
-
 @router.get("/", response_model=CommonResponse)
 async def list_chats(
     chat_repo: ChatRepository = Depends(get_chat_repository),
@@ -451,9 +426,13 @@ async def send_message(
                         }
                     )
 
-        response, resources, images = await agent.get_message(
+        response, resources, images, title = await agent.get_message(
             content, attachments=attachment_data
         )
+
+        if is_new_chat is True:
+            chat_repo.create_chat(title=title, session_id=session_id)
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={
@@ -461,6 +440,7 @@ async def send_message(
                 "session_id": session_id,
                 "resources": resources,
                 "images": images,
+                "title": title,
             },
         )
     except Exception as e:

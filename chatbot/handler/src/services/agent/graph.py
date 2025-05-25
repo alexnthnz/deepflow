@@ -4,13 +4,14 @@ from typing import Optional, List, Tuple
 from langchain_core.messages import ToolMessage, HumanMessage, SystemMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_postgres import PostgresChatMessageHistory
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, END, START
+from langgraph.types import Command
 
 from database import database
 
 from .llm import llm
 from .tools import TOOLS
-from .state import InputState, State
+from .state import State
 from .utils import format_response_message, format_tool_message
 
 logger = logging.getLogger(__name__)
@@ -26,10 +27,10 @@ class Graph:
             sync_connection=database.sync_connection,
         )
         self.model = llm.bind_tools(TOOLS)
-        workflow = StateGraph(State, input=InputState)
+        workflow = StateGraph(State)
+        workflow.add_edge(START, "llm")
         workflow.add_node("llm", self.__call_model)
         workflow.add_node("tools", self.__call_tools)
-        workflow.set_entry_point("llm")
         workflow.add_conditional_edges(
             "llm",
             self.__should_continue,
@@ -43,7 +44,11 @@ class Graph:
 
     def __call_model(self, state: State, config: RunnableConfig):
         response = self.model.invoke(state["messages"], config)
-        return {"messages": [response]}
+        return Command(
+            update={
+                "messages": [response]
+            }
+        )
 
     @staticmethod
     def __call_tools(state: State):
@@ -83,7 +88,12 @@ class Graph:
                         tool_call_id=tool_call["id"],
                     )
                 )
-        return {"messages": outputs}
+        return Command(
+            update={
+                "messages": outputs,
+                "is_last_step": state["is_last_step"],
+            }
+        )
 
     @staticmethod
     def __should_continue(state: State):
@@ -94,7 +104,7 @@ class Graph:
 
     async def get_message(
         self, question: str, attachments: Optional[List[dict]] = None
-    ) -> Tuple[str, List[str], List[str]]:
+    ) -> Tuple[str, List[str], List[str], str]:
         """
         Invoke the graph to process a question and return all new messages in a structured format.
 
@@ -103,7 +113,11 @@ class Graph:
             attachments (Optional[List[dict]]): Optional attachments related to the question.
 
         Returns:
-            str: A structured string containing all new messages generated during processing.
+            Tuple[str, List[str], List[str], str]: A tuple containing:
+                - A structured string of all new messages.
+                - List of message IDs.
+                - List of tool call IDs.
+                - The conversation title.
         """
         history_messages = self.conversation_history.get_messages()
 
@@ -184,8 +198,10 @@ class Graph:
 
             self.conversation_history.add_messages(filtered_messages)
 
-            return format_response_message(filtered_messages)
+            message, resources, images = format_response_message(filtered_messages)
+
+            return message, resources, images, "Untitled Conversation"
 
         except Exception as e:
-            logger.error(f"Error processing message: {e}")
-            return f"Error: Failed to process message: {str(e)}", [], []
+            logger.error(f"Error processing message: {e}", exc_info=True)
+            return f"Error: Failed to process message: {str(e)}", [], [], "Error Conversation"

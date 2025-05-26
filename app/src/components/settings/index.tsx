@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Settings, Cog, Network, Info, X, Plus, ExternalLink } from 'lucide-react';
+import { Settings, Cog, Network, Info, X, Plus, ExternalLink, GitBranch } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -53,6 +54,35 @@ function AddMCPServerDialog() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function WorkflowTabContent() {
+  const router = useRouter();
+  
+  const handleOpenWorkflow = () => {
+    router.push('/workflow');
+  };
+  
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium">Workflow Management</h3>
+        <DialogClose asChild>
+          <Button
+            size="sm"
+            className="flex items-center gap-2"
+            onClick={handleOpenWorkflow}
+          >
+            <GitBranch className="h-4 w-4" />
+            Open Workflow
+          </Button>
+        </DialogClose>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Access and manage your workflow settings and configurations. Click the button above to open the full workflow interface.
+      </p>
+    </div>
   );
 }
 
@@ -129,6 +159,12 @@ const settingsTabs: SettingsTab[] = [
         </p>
       </div>
     ),
+  },
+  {
+    id: 'workflow',
+    label: 'Workflow',
+    icon: <GitBranch className="h-4 w-4" />,
+    content: <WorkflowTabContent />,
   },
   {
     id: 'about',

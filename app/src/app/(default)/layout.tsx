@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, History } from 'lucide-react';
+import { PlusCircle, History, GitBranch } from 'lucide-react';
 import { SettingsDialog } from '@/components/settings';
 
 export default function DefaultLayout({ children }: { children: React.ReactNode }) {
@@ -13,12 +13,14 @@ export default function DefaultLayout({ children }: { children: React.ReactNode 
   const isChatsRoute = pathname === '/chats';
   const isChatSessionRoute = pathname.startsWith('/chats/');
   const isHomeRoute = pathname === '/';
+  const isWorkflowRoute = pathname === '/workflow';
 
   return (
     <div className="flex flex-col overflow-hidden w-full h-screen">
       <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white">
         <div className="flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
+            <GitBranch className="h-4 w-4" />
             <h1 className="text-xl font-semibold">DeepFlow</h1>
           </div>
           <div className="flex items-center gap-2">
@@ -34,7 +36,7 @@ export default function DefaultLayout({ children }: { children: React.ReactNode 
                 History
               </Button>
             )}
-            {(isChatsRoute || isChatSessionRoute) && (
+            {(isChatsRoute || isChatSessionRoute || isWorkflowRoute) && (
               <Button
                 variant="default"
                 size="sm"

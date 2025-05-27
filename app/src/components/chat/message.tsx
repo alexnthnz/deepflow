@@ -1,46 +1,18 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-import {AudioLines } from 'lucide-react';
-import { Message } from '@/store/chat';
+import { AudioLines } from 'lucide-react';
 import { Card } from '../ui/card';
+import { groupResourcesByDomain } from '@/lib/chat-utils';
+import type { ChatMessageProps } from '@/types/chat';
 
-// Extended Message type to include attachments
-interface ExtendedMessage extends Message {
-    attachments?: {
-        type: 'image' | 'audio' | 'other';
-        url: string;
-        name: string;
-    }[];
-}
-
-export default function ChatMessage({ role, content, attachments, resources, images }: { 
-    role: 'user' | 'assistant'; 
-    content: string;
-    attachments?: ExtendedMessage['attachments'];
-    resources?: string[];
-    images?: string[];
-  }) {
-    // Helper function to group resources by domain and count them
-    const groupResourcesByDomain = (resources: string[]) => {
-      const domainMap = new Map<string, number>();
-      
-      resources.forEach(url => {
-        try {
-          // Extract domain from URL
-          const domain = new URL(url).hostname.replace(/^www\./, '');
-          domainMap.set(domain, (domainMap.get(domain) || 0) + 1);
-        } catch {
-          // If URL parsing fails, use the original string
-          domainMap.set(url, (domainMap.get(url) || 0) + 1);
-        }
-      });
-      
-      return Array.from(domainMap.entries()).map(([domain, count]) => ({
-        domain,
-        count
-      }));
-    };
+export default function ChatMessage({ 
+  role, 
+  content, 
+  attachments, 
+  resources, 
+  images 
+}: ChatMessageProps) {
   
     return (
       <div className={`flex flex-col ${role === 'user' ? 'items-end' : 'items-start'} mb-6`}>

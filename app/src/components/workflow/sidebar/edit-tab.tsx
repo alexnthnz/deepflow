@@ -4,6 +4,13 @@ import type { NodeType, ToolType, NodeData, AgentNodeData, ToolsNodeData } from 
 import { AVAILABLE_TOOLS } from '../node';
 import MDEditor from '@uiw/react-md-editor';
 import '@uiw/react-md-editor/markdown-editor.css';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface EditTabProps {
   selectedNode: Node | null;
@@ -49,6 +56,26 @@ export function EditTab({
     );
   };
 
+  // Update edge source or target
+  const updateEdgeConnection = (field: 'source' | 'target', nodeId: string) => {
+    if (!selectedEdge) return;
+
+    // Prevent self-connections
+    if (field === 'source' && nodeId === selectedEdge.target) return;
+    if (field === 'target' && nodeId === selectedEdge.source) return;
+
+    setEdges((eds) =>
+      eds.map((edge) =>
+        edge.id === selectedEdge.id
+          ? { ...edge, [field]: nodeId }
+          : edge
+      )
+    );
+
+    // Update the selected edge to reflect the change
+    setSelectedEdge({ ...selectedEdge, [field]: nodeId });
+  };
+
   // Remove selected node (prevent deletion of start/end nodes)
   const removeNode = () => {
     if (!selectedNode) return;
@@ -73,9 +100,9 @@ export function EditTab({
 
   // Handle tool selection for existing tools node
   const handleExistingToolToggle = (tool: ToolType) => {
-    if (!selectedNode || selectedNode.data.nodeType !== 'tools') return;
+    if (!selectedNode || !currentNode || currentNode.data.nodeType !== 'tools') return;
     
-    const currentTools = (selectedNode.data as ToolsNodeData).selectedTools || [];
+    const currentTools = (currentNode.data as ToolsNodeData).selectedTools || [];
     const newTools = currentTools.includes(tool)
       ? currentTools.filter((t: ToolType) => t !== tool)
       : [...currentTools, tool];
@@ -166,7 +193,7 @@ export function EditTab({
                       />
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Provide clear instructions for the AI agent's behavior and goals. Markdown formatting is supported.
+                      Provide clear instructions for the AI agent&apos;s behavior and goals. Markdown formatting is supported.
                     </p>
                   </div>
                 )}
@@ -177,7 +204,7 @@ export function EditTab({
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Available Tools
                     </label>
-                    <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-3">
+                    <div className="space-y-2 max-h-64 overflow-y-auto border border-gray-200 rounded-md p-3">
                       {AVAILABLE_TOOLS.map((tool) => {
                         const isSelected = ((nodeData as ToolsNodeData).selectedTools || []).includes(tool.value);
                         return (
@@ -238,42 +265,87 @@ export function EditTab({
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                From
+                From Node
               </label>
-              <input
-                type="text"
-                value={(() => {
-                  const sourceNode = nodes.find(n => n.id === selectedEdge.source);
-                  if (sourceNode) {
-                    const nodeData = sourceNode.data as NodeData;
+              <Select
+                value={selectedEdge.source}
+                onValueChange={(value) => updateEdgeConnection('source', value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose source node..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {nodes.map((node) => {
+                    const nodeData = node.data as NodeData;
                     const typeInfo = getNodeTypeInfo(nodeData.nodeType);
-                    return `${typeInfo?.label}: ${nodeData.name}`;
-                  }
-                  return selectedEdge.source;
-                })()}
-                readOnly
-                className="w-full rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-gray-50"
-              />
+                    const isDisabled = node.id === selectedEdge.target; // Prevent self-connection
+                    
+                    return (
+                      <SelectItem 
+                        key={node.id} 
+                        value={node.id}
+                        disabled={isDisabled}
+                        className={isDisabled ? 'opacity-50' : ''}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={typeInfo.color}>{typeInfo.icon}</span>
+                          <span>{typeInfo.label}: {nodeData.name}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
+            
+            <div className="flex justify-center">
+              <div className="p-2 bg-gray-100 rounded-full">
+                <Unlink size={16} className="text-gray-600" />
+              </div>
+            </div>
+            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                To
+                To Node
               </label>
-              <input
-                type="text"
-                value={(() => {
-                  const targetNode = nodes.find(n => n.id === selectedEdge.target);
-                  if (targetNode) {
-                    const nodeData = targetNode.data as NodeData;
+              <Select
+                value={selectedEdge.target}
+                onValueChange={(value) => updateEdgeConnection('target', value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose target node..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {nodes.map((node) => {
+                    const nodeData = node.data as NodeData;
                     const typeInfo = getNodeTypeInfo(nodeData.nodeType);
-                    return `${typeInfo?.label}: ${nodeData.name}`;
-                  }
-                  return selectedEdge.target;
-                })()}
-                readOnly
-                className="w-full rounded-md border border-gray-300 shadow-sm px-3 py-2 bg-gray-50"
-              />
+                    const isDisabled = node.id === selectedEdge.source; // Prevent self-connection
+                    
+                    return (
+                      <SelectItem 
+                        key={node.id} 
+                        value={node.id}
+                        disabled={isDisabled}
+                        className={isDisabled ? 'opacity-50' : ''}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={typeInfo.color}>{typeInfo.icon}</span>
+                          <span>{typeInfo.label}: {nodeData.name}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+              <p className="text-sm text-blue-800">
+                <strong>Connection Info:</strong> You can change the source and target nodes of this connection. 
+                Self-connections are not allowed.
+              </p>
+            </div>
+            
             <button
               onClick={removeEdge}
               className="w-full bg-red-600 text-white px-4 py-3 rounded-md hover:bg-red-700 flex items-center justify-center gap-2 font-medium"

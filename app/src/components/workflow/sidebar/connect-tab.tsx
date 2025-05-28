@@ -1,8 +1,15 @@
 import { useState } from 'react';
-import { Link, Edit3, Bot, Wrench, Play, Square } from 'lucide-react';
+import { Link, Edit3, Bot, Wrench, Play, Square, Trash2 } from 'lucide-react';
 import { Node, Edge } from '@xyflow/react';
 import type { NodeType, NodeData } from '../node';
 import type { TabType } from './tab-navigation';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface ConnectTabProps {
   nodes: Node[];
@@ -52,6 +59,11 @@ export function ConnectTab({ nodes, edges, setEdges, setSelectedEdge, setActiveT
     setTargetNodeId('');
   };
 
+  // Delete an edge
+  const deleteEdge = (edgeId: string) => {
+    setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
+  };
+
   return (
     <div className="p-4 space-y-6">
       <div>
@@ -64,22 +76,35 @@ export function ConnectTab({ nodes, edges, setEdges, setSelectedEdge, setActiveT
           <label className="block text-sm font-medium text-gray-700 mb-2">
             From Node
           </label>
-          <select
+          <Select
             value={sourceNodeId}
-            onChange={(e) => setSourceNodeId(e.target.value)}
-            className="w-full rounded-md border border-gray-300 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            onValueChange={setSourceNodeId}
           >
-            <option value="">Choose source node...</option>
-            {nodes.map((node) => {
-              const nodeData = node.data as NodeData;
-              const typeInfo = getNodeTypeInfo(nodeData.nodeType);
-              return (
-                <option key={node.id} value={node.id}>
-                  {typeInfo.label}: {nodeData.name}
-                </option>
-              );
-            })}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Choose source node..." />
+            </SelectTrigger>
+            <SelectContent>
+              {nodes.map((node) => {
+                const nodeData = node.data as NodeData;
+                const typeInfo = getNodeTypeInfo(nodeData.nodeType);
+                const isDisabled = node.id === targetNodeId; // Prevent self-connection
+                
+                return (
+                  <SelectItem 
+                    key={node.id} 
+                    value={node.id}
+                    disabled={isDisabled}
+                    className={isDisabled ? 'opacity-50' : ''}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={typeInfo.color}>{typeInfo.icon}</span>
+                      <span>{typeInfo.label}: {nodeData.name}</span>
+                    </div>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
         </div>
         
         <div className="flex justify-center">
@@ -92,22 +117,35 @@ export function ConnectTab({ nodes, edges, setEdges, setSelectedEdge, setActiveT
           <label className="block text-sm font-medium text-gray-700 mb-2">
             To Node
           </label>
-          <select
+          <Select
             value={targetNodeId}
-            onChange={(e) => setTargetNodeId(e.target.value)}
-            className="w-full rounded-md border border-gray-300 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            onValueChange={setTargetNodeId}
           >
-            <option value="">Choose target node...</option>
-            {nodes.map((node) => {
-              const nodeData = node.data as NodeData;
-              const typeInfo = getNodeTypeInfo(nodeData.nodeType);
-              return (
-                <option key={node.id} value={node.id}>
-                  {typeInfo.label}: {nodeData.name}
-                </option>
-              );
-            })}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Choose target node..." />
+            </SelectTrigger>
+            <SelectContent>
+              {nodes.map((node) => {
+                const nodeData = node.data as NodeData;
+                const typeInfo = getNodeTypeInfo(nodeData.nodeType);
+                const isDisabled = node.id === sourceNodeId; // Prevent self-connection
+                
+                return (
+                  <SelectItem 
+                    key={node.id} 
+                    value={node.id}
+                    disabled={isDisabled}
+                    className={isDisabled ? 'opacity-50' : ''}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={typeInfo.color}>{typeInfo.icon}</span>
+                      <span>{typeInfo.label}: {nodeData.name}</span>
+                    </div>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
         </div>
         
         <button
@@ -122,30 +160,60 @@ export function ConnectTab({ nodes, edges, setEdges, setSelectedEdge, setActiveT
 
       {edges.length > 0 && (
         <div className="mt-8">
-          <h4 className="font-medium text-gray-900 mb-3">Existing Connections</h4>
-          <div className="space-y-2 max-h-40 overflow-y-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-medium text-gray-900">Existing Connections</h4>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+              {edges.length} connection{edges.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="space-y-3">
             {edges.map((edge) => {
               const sourceNode = nodes.find(n => n.id === edge.source);
               const targetNode = nodes.find(n => n.id === edge.target);
               const sourceData = sourceNode?.data as NodeData;
               const targetData = targetNode?.data as NodeData;
+              const sourceTypeInfo = getNodeTypeInfo(sourceData?.nodeType);
+              const targetTypeInfo = getNodeTypeInfo(targetData?.nodeType);
               
               return (
-                <div key={edge.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                  <div className="text-sm">
-                    <span className="font-medium">{sourceData?.name}</span>
-                    <span className="text-gray-500 mx-2">→</span>
-                    <span className="font-medium">{targetData?.name}</span>
+                <div key={edge.id} className="bg-white border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 text-sm">
+                        <div className="flex items-center gap-1">
+                          <span className={sourceTypeInfo.color}>{sourceTypeInfo.icon}</span>
+                          <span className="font-medium text-gray-900">{sourceData?.name}</span>
+                        </div>
+                        <span className="text-gray-400">→</span>
+                        <div className="flex items-center gap-1">
+                          <span className={targetTypeInfo.color}>{targetTypeInfo.icon}</span>
+                          <span className="font-medium text-gray-900">{targetData?.name}</span>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {sourceTypeInfo.label} to {targetTypeInfo.label} • {edge.type || 'default'} edge
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 ml-3">
+                      <button
+                        onClick={() => {
+                          setSelectedEdge(edge);
+                          setActiveTab('edit');
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        title="Edit connection"
+                      >
+                        <Edit3 size={14} />
+                      </button>
+                      <button
+                        onClick={() => deleteEdge(edge.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Delete connection"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setSelectedEdge(edge);
-                      setActiveTab('edit');
-                    }}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <Edit3 size={14} />
-                  </button>
                 </div>
               );
             })}

@@ -131,7 +131,8 @@ export const deleteChatSessionAtom = atom(
   null,
   (get, set, sessionId: string) => {
     const sessions = get(chatSessionsAtom);
-    const { [sessionId]: _removed, ...remainingSessions } = sessions;
+    const remainingSessions = { ...sessions };
+    delete remainingSessions[sessionId];
     
     set(chatSessionsAtom, remainingSessions);
   }

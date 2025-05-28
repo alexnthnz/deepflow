@@ -194,7 +194,7 @@ export function CreateTab({ setNodes }: CreateTabProps) {
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Provide clear instructions for the AI agent's behavior and goals. Markdown formatting is supported.
+              Provide clear instructions for the AI agent&apos;s behavior and goals. Markdown formatting is supported.
             </p>
           </div>
         )}
@@ -205,7 +205,7 @@ export function CreateTab({ setNodes }: CreateTabProps) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Available Tools *
             </label>
-            <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-3">
+            <div className="space-y-2 max-h-64 overflow-y-auto border border-gray-200 rounded-md p-3">
               {AVAILABLE_TOOLS.map((tool) => (
                 <label key={tool.value} className="flex items-center space-x-3 cursor-pointer p-2 rounded hover:bg-gray-50">
                   <input

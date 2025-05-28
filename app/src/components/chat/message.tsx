@@ -43,7 +43,7 @@ export default function ChatMessage({
                 remarkPlugins={[remarkGfm]}
                 components={{
                   // Override default component renderers
-                  a: ({ node, ...props }: { node?: any; className?: string } & React.HTMLAttributes<HTMLAnchorElement>) => (
+                  a: ({ ...props }: { className?: string } & React.HTMLAttributes<HTMLAnchorElement>) => (
                     <a 
                       {...props} 
                       target="_blank" 
@@ -51,30 +51,30 @@ export default function ChatMessage({
                       className="text-blue-600 hover:underline"
                     />
                   ),
-                  code: ({ node, inline, ...props }: { node?: any; inline?: boolean; className?: string } & React.HTMLAttributes<HTMLElement>) => (
+                  code: ({ inline, ...props }: { inline?: boolean; className?: string } & React.HTMLAttributes<HTMLElement>) => (
                     inline 
                       ? <code {...props} className="bg-gray-200 px-1 py-0.5 rounded text-sm font-mono" />
                       : <code {...props} className="block bg-gray-800 text-gray-200 p-3 rounded-md overflow-x-auto my-3 text-sm font-mono" />
                   ),
-                  p: ({ node, ...props }: { node?: any } & React.HTMLAttributes<HTMLParagraphElement>) => (
+                  p: ({ ...props }: React.HTMLAttributes<HTMLParagraphElement>) => (
                     <p {...props} className="text-base leading-relaxed my-3" />
                   ),
-                  ul: ({ node, ...props }: { node?: any } & React.HTMLAttributes<HTMLUListElement>) => (
+                  ul: ({ ...props }: React.HTMLAttributes<HTMLUListElement>) => (
                     <ul {...props} className="list-disc pl-6 my-3 text-base" />
                   ),
-                  ol: ({ node, ...props }: { node?: any } & React.HTMLAttributes<HTMLOListElement>) => (
+                  ol: ({ ...props }: React.HTMLAttributes<HTMLOListElement>) => (
                     <ol {...props} className="list-decimal pl-6 my-3 text-base" />
                   ),
-                  li: ({ node, ...props }: { node?: any } & React.HTMLAttributes<HTMLLIElement>) => (
+                  li: ({ ...props }: React.HTMLAttributes<HTMLLIElement>) => (
                     <li {...props} className="my-1.5 text-base" />
                   ),
-                  h1: ({ node, ...props }: { node?: any } & React.HTMLAttributes<HTMLHeadingElement>) => (
+                  h1: ({ ...props }: React.HTMLAttributes<HTMLHeadingElement>) => (
                     <h1 {...props} className="text-2xl font-bold my-4" />
                   ),
-                  h2: ({ node, ...props }: { node?: any } & React.HTMLAttributes<HTMLHeadingElement>) => (
+                  h2: ({ ...props }: React.HTMLAttributes<HTMLHeadingElement>) => (
                     <h2 {...props} className="text-xl font-bold my-3" />
                   ),
-                  h3: ({ node, ...props }: { node?: any } & React.HTMLAttributes<HTMLHeadingElement>) => (
+                  h3: ({ ...props }: React.HTMLAttributes<HTMLHeadingElement>) => (
                     <h3 {...props} className="text-lg font-bold my-3" />
                   ),
                 }}

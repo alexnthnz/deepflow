@@ -19,10 +19,13 @@ export default function DefaultLayout({ children }: { children: React.ReactNode 
     <div className="flex flex-col overflow-hidden w-full h-screen">
       <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white">
         <div className="flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-2">
+          <button 
+            onClick={() => router.push('/')}
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
+          >
             <GitBranch className="h-4 w-4" />
             <h1 className="text-xl font-semibold">DeepFlow</h1>
-          </div>
+          </button>
           <div className="flex items-center gap-2">
             <SettingsDialog />
             {(isChatSessionRoute || isHomeRoute) && (

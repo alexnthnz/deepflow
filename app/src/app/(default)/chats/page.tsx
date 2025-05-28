@@ -47,7 +47,7 @@ export default function ChatsPage() {
       
       {sessionIds.length === 0 ? (
         <div className="text-center p-16 bg-white rounded-lg border border-gray-200 shadow-sm">
-          <p className="text-gray-500 mb-6 text-lg">You don't have any chat sessions yet.</p>
+          <p className="text-gray-500 mb-6 text-lg">You don&apos;t have any chat sessions yet.</p>
           <Button onClick={navigateToHome} className="text-base px-6 py-5">Start a chat</Button>
         </div>
       ) : (

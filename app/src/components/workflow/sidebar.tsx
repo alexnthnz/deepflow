@@ -6,6 +6,7 @@ import {
   CreateTab, 
   EditTab, 
   ConnectTab, 
+  LayoutTab,
   OverviewTab, 
   UndoNotification,
   type TabType 
@@ -48,11 +49,11 @@ function Sidebar({
   const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-switch to edit tab when something is selected
-  useState(() => {
-    if ((selectedNode || selectedEdge) && activeTab === 'create') {
+  useEffect(() => {
+    if (selectedNode || selectedEdge) {
       setActiveTab('edit');
     }
-  });
+  }, [selectedNode, selectedEdge]);
 
   // Cleanup undo timeout on unmount
   useEffect(() => {
@@ -169,6 +170,15 @@ function Sidebar({
             setEdges={setEdges}
             setSelectedEdge={setSelectedEdge}
             setActiveTab={setActiveTab}
+          />
+        )}
+
+        {activeTab === 'layout' && (
+          <LayoutTab 
+            nodes={nodes}
+            edges={edges}
+            setNodes={setNodes}
+            setEdges={setEdges}
           />
         )}
 

@@ -34,7 +34,7 @@ export function UndoNotification({
           </div>
           <div>
             <p className="text-sm font-medium">
-              Deleted "{(deletedNodeData.node.data as NodeData).name}"
+              Deleted &quot;{(deletedNodeData.node.data as NodeData).name}&quot;
             </p>
             <p className="text-xs text-gray-300">
               {deletedNodeData.connectedEdges.length} connection{deletedNodeData.connectedEdges.length !== 1 ? 's' : ''} removed

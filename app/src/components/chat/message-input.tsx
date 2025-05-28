@@ -44,8 +44,7 @@ export function MessageInput({
     triggerFileUpload,
     removeAttachment,
     clearAttachments,
-    hasReachedLimit,
-    getFileType
+    hasReachedLimit
   } = useFileUpload(maxAttachments);
 
   const {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useAtom, useSetAtom } from 'jotai';
 
 import { sendMessage } from '@/actions/chat';
@@ -36,7 +36,6 @@ interface ExtendedMessage extends Message {
 
 export default function ChatPage() {
   const params = useParams();
-  const router = useRouter();
   const session_id = params.session_id as string;
   
   const MAX_ATTACHMENTS = 5; // Maximum number of attachments allowed

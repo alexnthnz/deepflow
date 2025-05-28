@@ -15,11 +15,14 @@ import {
   ConnectionMode,
   NodeMouseHandler,
   EdgeMouseHandler,
+  Panel,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import CustomNode from '@/components/workflow/node';
 import Sidebar from '@/components/workflow/sidebar';
-import { Undo2, X, Trash2 } from 'lucide-react';
+import { GlobalUndoNotification } from '@/components/workflow/global-undo-notification';
+import { LayoutGrid } from 'lucide-react';
+import { getLayoutedElements } from '@/lib/layout-utils';
 
 const nodeTypes = {
   custom: CustomNode,
@@ -88,10 +91,55 @@ export default function WorkflowPage() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
+  const [isLayouting, setIsLayouting] = useState(false);
+  const reactFlowInstance = useRef<any>(null);
   
   // Undo functionality state
   const [deletedNodeData, setDeletedNodeData] = useState<DeletedNodeData | null>(null);
   const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Apply initial layout on mount
+  useEffect(() => {
+    const applyInitialLayout = async () => {
+      try {
+        const { nodes: layoutedNodes, edges: layoutedEdges } = await getLayoutedElements(initialNodes, initialEdges);
+        setNodes(layoutedNodes);
+        setEdges(layoutedEdges);
+        // Center the view after layout is applied
+        setTimeout(() => {
+          if (reactFlowInstance.current) {
+            reactFlowInstance.current.fitView({ padding: 0.1, duration: 800 });
+          }
+        }, 100);
+      } catch (error) {
+        console.error('Initial layout failed:', error);
+      }
+    };
+    
+    applyInitialLayout();
+  }, []); // Only run once on mount
+
+  // Quick layout function for the panel button
+  const applyQuickLayout = async () => {
+    if (nodes.length === 0 || isLayouting) return;
+    
+    setIsLayouting(true);
+    try {
+      const { nodes: layoutedNodes, edges: layoutedEdges } = await getLayoutedElements(nodes, edges);
+      setNodes(layoutedNodes);
+      setEdges(layoutedEdges);
+      // Center the view after layout is applied
+      setTimeout(() => {
+        if (reactFlowInstance.current) {
+          reactFlowInstance.current.fitView({ padding: 0.1, duration: 800 });
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Quick layout failed:', error);
+    } finally {
+      setIsLayouting(false);
+    }
+  };
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -193,6 +241,11 @@ export default function WorkflowPage() {
     // Users must use the "Delete Node" button in the sidebar for intentional deletion
   }, [undoNodeDeletion]);
 
+  // Handle ReactFlow initialization
+  const onInit = useCallback((instance: any) => {
+    reactFlowInstance.current = instance;
+  }, []);
+
   return (
     <div className="flex w-full h-full relative" onKeyDown={onKeyDown} tabIndex={0}>
       <div className="flex-1 h-full">
@@ -209,7 +262,7 @@ export default function WorkflowPage() {
           connectionMode={ConnectionMode.Loose}
           nodeTypes={nodeTypes}
           defaultEdgeOptions={{ type: 'smoothstep' }}
-          fitView
+          onInit={onInit}
           deleteKeyCode={null} // Disable default delete behavior completely
           multiSelectionKeyCode={null} // Disable multi-selection for simplicity
           nodesConnectable={true}
@@ -219,6 +272,19 @@ export default function WorkflowPage() {
           <Background />
           <Controls />
           <MiniMap />
+          
+          {/* Quick Layout Panel */}
+          <Panel position="top-right" className="m-2">
+            <button
+              onClick={applyQuickLayout}
+              disabled={isLayouting || nodes.length === 0}
+              className="bg-white border border-gray-300 rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+              title="Auto arrange nodes"
+            >
+              <LayoutGrid size={16} className={isLayouting ? 'animate-spin' : ''} />
+              {isLayouting ? 'Layouting...' : 'Auto Layout'}
+            </button>
+          </Panel>
         </ReactFlow>
       </div>
       <Sidebar 
@@ -234,56 +300,11 @@ export default function WorkflowPage() {
       />
 
       {/* Global Undo Notification */}
-      {deletedNodeData && (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white p-4 rounded-lg shadow-lg border border-gray-700 z-50 min-w-[320px]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-1 bg-gray-700 rounded">
-                <Trash2 size={16} />
-              </div>
-              <div>
-                <p className="text-sm font-medium">
-                  Deleted "{(deletedNodeData.node.data as any).name}"
-                </p>
-                <p className="text-xs text-gray-300">
-                  {deletedNodeData.connectedEdges.length} connection{deletedNodeData.connectedEdges.length !== 1 ? 's' : ''} removed
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={undoNodeDeletion}
-                className="flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
-              >
-                <Undo2 size={14} />
-                Undo
-              </button>
-              <button
-                onClick={() => setDeletedNodeData(null)}
-                className="p-1 hover:bg-gray-700 rounded transition-colors"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          </div>
-          <div className="mt-2 bg-gray-700 rounded-full h-1 overflow-hidden">
-            <div 
-              className="h-full bg-blue-500 transition-all duration-[10000ms] ease-linear w-0"
-              style={{ animation: 'countdown 10s linear forwards' }}
-            />
-          </div>
-          <p className="text-xs text-gray-400 mt-2">
-            Press <kbd className="px-1 py-0.5 bg-gray-700 rounded text-xs">Ctrl+Z</kbd> to undo
-          </p>
-        </div>
-      )}
-
-      <style jsx>{`
-        @keyframes countdown {
-          from { width: 100%; }
-          to { width: 0%; }
-        }
-      `}</style>
+      <GlobalUndoNotification
+        deletedNodeData={deletedNodeData}
+        onUndo={undoNodeDeletion}
+        onDismiss={() => setDeletedNodeData(null)}
+      />
     </div>
   );
 } 

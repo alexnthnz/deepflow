@@ -39,7 +39,7 @@ function AddMCPServerDialog() {
         <DialogHeader>
           <DialogTitle>Add New MCP Server</DialogTitle>
           <DialogDescription>
-            DeepFlow uses the standard JSON MCP config to create a new server. Paste your config below and click "Add" to add new servers.
+            DeepFlow uses the standard JSON MCP config to create a new server. Paste your config below and click &quot;Add&quot; to add new servers.
           </DialogDescription>
         </DialogHeader>
         <Textarea 

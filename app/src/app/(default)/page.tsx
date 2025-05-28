@@ -133,18 +133,6 @@ export default function HomePage() {
 
   const hasReachedAttachmentLimit = attachments.length >= MAX_ATTACHMENTS;
 
-  const cardVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: (index: number) => ({
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        delay: index * 0.1,
-      },
-    }),
-  };
-
   return (
     <div className="flex flex-col bg-gray-50 h-[calc(100vh-64px)]">
       {isLoading ? (

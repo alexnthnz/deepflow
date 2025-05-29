@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Enum,
     JSON,
+    Index,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -86,3 +87,131 @@ class ChatTag(Base):
     __tablename__ = "chat_tags"
     chat_id = Column(UUID(as_uuid=True), ForeignKey("chats.id"), primary_key=True)
     tag_id = Column(UUID(as_uuid=True), ForeignKey("tags.id"), primary_key=True)
+
+
+# Dynamic Graph Configuration Models
+class Graph(Base):
+    __tablename__ = "graphs"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(String, nullable=True)
+    version = Column(String(50), default="1.0.0")
+    is_active = Column(Boolean, default=False)
+    is_default = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    nodes = relationship("GraphNode", back_populates="graph", cascade="all, delete-orphan")
+    edges = relationship("GraphEdge", back_populates="graph", cascade="all, delete-orphan")
+    executions = relationship("GraphExecution", back_populates="graph")
+
+
+class GraphNode(Base):
+    __tablename__ = "graph_nodes"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    graph_id = Column(UUID(as_uuid=True), ForeignKey("graphs.id"), nullable=False, index=True)
+    node_id = Column(String(100), nullable=False)  # unique within graph
+    node_type = Column(String(50), nullable=False)  # 'llm', 'tool', 'condition', 'human', 'start', 'end'
+    name = Column(String(255), nullable=False)
+    description = Column(String, nullable=True)
+    position_x = Column(Integer, default=0)
+    position_y = Column(Integer, default=0)
+    configuration = Column(JSON, default={})
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    graph = relationship("Graph", back_populates="nodes")
+    tools = relationship("NodeTool", back_populates="node", cascade="all, delete-orphan")
+
+    # Unique constraint
+    __table_args__ = (
+        Index('ix_graph_node_unique', 'graph_id', 'node_id', unique=True),
+    )
+
+
+class GraphEdge(Base):
+    __tablename__ = "graph_edges"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    graph_id = Column(UUID(as_uuid=True), ForeignKey("graphs.id"), nullable=False, index=True)
+    from_node_id = Column(String(100), nullable=False)
+    to_node_id = Column(String(100), nullable=False)
+    condition_type = Column(String(50), nullable=True)  # 'always', 'conditional', 'tool_result'
+    condition_config = Column(JSON, default={})
+    label = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    graph = relationship("Graph", back_populates="edges")
+
+
+class AvailableTool(Base):
+    __tablename__ = "available_tools"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    name = Column(String(100), unique=True, nullable=False)
+    display_name = Column(String(255), nullable=False)
+    description = Column(String, nullable=True)
+    tool_type = Column(String(50), nullable=False)  # 'search', 'api', 'function', 'human'
+    schema = Column(JSON, nullable=False)  # tool input/output schema
+    configuration = Column(JSON, default={})  # default config
+    is_enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    node_tools = relationship("NodeTool", back_populates="tool")
+
+
+class NodeTool(Base):
+    __tablename__ = "node_tools"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    node_id = Column(UUID(as_uuid=True), ForeignKey("graph_nodes.id"), nullable=False)
+    tool_id = Column(UUID(as_uuid=True), ForeignKey("available_tools.id"), nullable=False)
+    tool_config = Column(JSON, default={})  # node-specific tool config
+    is_enabled = Column(Boolean, default=True)
+
+    # Relationships
+    node = relationship("GraphNode", back_populates="tools")
+    tool = relationship("AvailableTool", back_populates="node_tools")
+
+    # Unique constraint
+    __table_args__ = (
+        Index('ix_node_tool_unique', 'node_id', 'tool_id', unique=True),
+    )
+
+
+class GraphExecution(Base):
+    __tablename__ = "graph_executions"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    graph_id = Column(UUID(as_uuid=True), ForeignKey("graphs.id"), nullable=False, index=True)
+    chat_id = Column(UUID(as_uuid=True), ForeignKey("chats.id"), nullable=True, index=True)
+    session_id = Column(String(255), nullable=True)
+    status = Column(String(50), default="running")  # 'running', 'completed', 'failed', 'interrupted'
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    error_message = Column(String, nullable=True)
+    execution_metadata = Column(JSON, default={})
+
+    # Relationships
+    graph = relationship("Graph", back_populates="executions")
+    chat = relationship("Chat")
+    node_executions = relationship("NodeExecution", back_populates="execution", cascade="all, delete-orphan")
+
+
+class NodeExecution(Base):
+    __tablename__ = "node_executions"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    execution_id = Column(UUID(as_uuid=True), ForeignKey("graph_executions.id"), nullable=False, index=True)
+    node_id = Column(String(100), nullable=False)
+    status = Column(String(50), default="pending")  # 'pending', 'running', 'completed', 'failed', 'skipped'
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    input_data = Column(JSON, nullable=True)
+    output_data = Column(JSON, nullable=True)
+    error_message = Column(String, nullable=True)
+    execution_time_ms = Column(Integer, nullable=True)
+    tokens_used = Column(Integer, default=0)
+    cost_usd = Column(Integer, default=0)  # Store as cents to avoid decimal precision issues
+
+    # Relationships
+    execution = relationship("GraphExecution", back_populates="node_executions")

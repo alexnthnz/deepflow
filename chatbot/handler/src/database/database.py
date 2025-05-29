@@ -28,6 +28,11 @@ def get_db():
         db.close()
 
 
+def get_session():
+    """Get a database session for direct use."""
+    return SessionLocal()
+
+
 def check_db_connection():
     """Verify we can connect and run a simple query."""
     try:
@@ -47,7 +52,7 @@ def list_tables():
 
 def migrate_db():
     """
-    Create all tables defined on Base.metadata.
+    Create all tables defined on Base.metadata and seed with default data.
     Accepts an optional Session for signature consistency.
     """
     try:
@@ -57,7 +62,19 @@ def migrate_db():
         Base.metadata.create_all(bind=engine)
         PostgresChatMessageHistory.create_tables(sync_connection, "chat_history")
         logger.info("Database migrations applied successfully")
-        return {"status": "success", "detail": "Migrations applied"}
+        
+        # Seed the database with default data
+        try:
+            from database.seed_data import seed_database
+            seed_result = seed_database()
+            if seed_result["status"] == "success":
+                logger.info("Database seeding completed successfully")
+            else:
+                logger.warning(f"Database seeding had issues: {seed_result['message']}")
+        except Exception as e:
+            logger.warning(f"Database seeding failed, but migration succeeded: {e}")
+        
+        return {"status": "success", "detail": "Migrations applied and database seeded"}
     except Exception as e:
         logger.error(f"Migration error: {e}", exc_info=True)
         return {"status": "error", "detail": str(e)}

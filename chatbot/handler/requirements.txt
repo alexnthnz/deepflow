@@ -19,3 +19,4 @@ langchain-postgres
 langchain-tavily
 langgraph
 langsmith
+jsonschema==4.23.0

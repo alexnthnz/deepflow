@@ -11,6 +11,7 @@ import {
   UndoNotification,
   type TabType 
 } from './sidebar/index';
+import { LayoutDirection } from './node';
 
 interface SidebarProps {
   selectedNode: Node | null;
@@ -22,6 +23,9 @@ interface SidebarProps {
   setSelectedNode: (node: Node | null) => void;
   setSelectedEdge: (edge: Edge | null) => void;
   onDeleteNode?: (node: Node) => void; // Optional callback for external deletion handling
+  layoutDirection?: LayoutDirection;
+  setLayoutDirection?: (direction: LayoutDirection) => void;
+  updateNodesLayoutDirection?: (direction: LayoutDirection) => void;
 }
 
 interface DeletedNodeData {
@@ -39,7 +43,10 @@ function Sidebar({
   setEdges,
   setSelectedNode,
   setSelectedEdge,
-  onDeleteNode
+  onDeleteNode,
+  layoutDirection,
+  setLayoutDirection,
+  updateNodesLayoutDirection
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<TabType>('create');
   
@@ -148,7 +155,10 @@ function Sidebar({
 
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'create' && (
-          <CreateTab setNodes={setNodes} />
+          <CreateTab 
+            setNodes={setNodes} 
+            layoutDirection={layoutDirection}
+          />
         )}
 
         {activeTab === 'edit' && (
@@ -179,6 +189,9 @@ function Sidebar({
             edges={edges}
             setNodes={setNodes}
             setEdges={setEdges}
+            layoutDirection={layoutDirection}
+            setLayoutDirection={setLayoutDirection}
+            updateNodesLayoutDirection={updateNodesLayoutDirection}
           />
         )}
 

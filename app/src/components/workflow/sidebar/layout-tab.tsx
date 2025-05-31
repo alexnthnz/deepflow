@@ -2,12 +2,16 @@ import { useState } from 'react';
 import { LayoutGrid, RefreshCw, ArrowRight, ArrowDown, ArrowLeft, ArrowUp } from 'lucide-react';
 import { Node, Edge } from '@xyflow/react';
 import { getLayoutedElements, layoutDirections, updateLayoutDirection } from '@/lib/layout-utils';
+import { LayoutDirection } from '../node';
 
 interface LayoutTabProps {
   nodes: Node[];
   edges: Edge[];
   setNodes: (nodes: Node[] | ((nodes: Node[]) => Node[])) => void;
   setEdges: (edges: Edge[] | ((edges: Edge[]) => Edge[])) => void;
+  layoutDirection?: LayoutDirection;
+  setLayoutDirection?: (direction: LayoutDirection) => void;
+  updateNodesLayoutDirection?: (direction: LayoutDirection) => void;
 }
 
 const directionIcons = {
@@ -25,7 +29,15 @@ const edgeTypes = [
   { value: 'simplebezier', label: 'Simple Bezier', description: 'Simple curved edges' },
 ] as const;
 
-export function LayoutTab({ nodes, edges, setNodes, setEdges }: LayoutTabProps) {
+export function LayoutTab({ 
+  nodes, 
+  edges, 
+  setNodes, 
+  setEdges, 
+  layoutDirection: externalLayoutDirection,
+  setLayoutDirection: setExternalLayoutDirection,
+  updateNodesLayoutDirection 
+}: LayoutTabProps) {
   const [isLayouting, setIsLayouting] = useState(false);
   const [layoutDirection, setLayoutDirection] = useState<keyof typeof layoutDirections>('RIGHT');
   const [selectedEdgeType, setSelectedEdgeType] = useState<string>('smoothstep');
@@ -47,6 +59,14 @@ export function LayoutTab({ nodes, edges, setNodes, setEdges }: LayoutTabProps) 
       
       setNodes(layoutedNodes);
       setEdges(edgesWithType);
+
+      // Update node connection points based on layout direction
+      if (updateNodesLayoutDirection && setExternalLayoutDirection) {
+        const nodeLayoutDirection: LayoutDirection = 
+          layoutDirection === 'RIGHT' || layoutDirection === 'LEFT' ? 'horizontal' : 'vertical';
+        setExternalLayoutDirection(nodeLayoutDirection);
+        updateNodesLayoutDirection(nodeLayoutDirection);
+      }
     } catch (error) {
       console.error('Layout failed:', error);
     } finally {

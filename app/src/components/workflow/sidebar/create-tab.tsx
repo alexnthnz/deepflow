@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Bot, Wrench, X } from 'lucide-react';
-import type { NodeType, ToolType, NodeData } from '../node';
+import type { NodeType, ToolType, NodeData, LayoutDirection } from '../node';
 import { AVAILABLE_TOOLS } from '../node';
 import MDEditor from '@uiw/react-md-editor';
 import '@uiw/react-md-editor/markdown-editor.css';
@@ -8,6 +8,7 @@ import { Node } from '@xyflow/react';
 
 interface CreateTabProps {
   setNodes: (nodes: Node[] | ((nodes: Node[]) => Node[])) => void;
+  layoutDirection?: LayoutDirection;
 }
 
 const NODE_TYPES: { value: NodeType; label: string; icon: React.ReactNode; color: string; description: string }[] = [
@@ -34,12 +35,13 @@ const ALL_NODE_TYPES: { value: NodeType; label: string; icon: React.ReactNode; c
   { value: 'end', label: 'End', icon: <X size={16} />, color: 'text-red-600' },
 ];
 
-export function CreateTab({ setNodes }: CreateTabProps) {
+export function CreateTab({ setNodes, layoutDirection }: CreateTabProps) {
   const [newNodeName, setNewNodeName] = useState('');
   const [newNodeDescription, setNewNodeDescription] = useState('');
   const [newNodeType, setNewNodeType] = useState<NodeType>('agent');
   const [newAgentPrompt, setNewAgentPrompt] = useState('');
   const [newToolsSelection, setNewToolsSelection] = useState<ToolType[]>([]);
+  const [ragDataSource, setRagDataSource] = useState('');
 
   // Get node type info
   const getNodeTypeInfo = (nodeType: NodeType) => {
@@ -66,20 +68,24 @@ export function CreateTab({ setNodes }: CreateTabProps) {
         name: newNodeName,
         description: newNodeDescription || undefined,
         nodeType: 'agent',
-        prompt: newAgentPrompt
+        prompt: newAgentPrompt,
+        layoutDirection: layoutDirection || 'horizontal'
       };
     } else if (newNodeType === 'tools') {
       nodeData = {
         name: newNodeName,
         description: newNodeDescription || undefined,
         nodeType: 'tools',
-        selectedTools: newToolsSelection
+        selectedTools: newToolsSelection,
+        ragDataSource: newToolsSelection.includes('rag') ? ragDataSource : undefined,
+        layoutDirection: layoutDirection || 'horizontal'
       };
     } else {
       nodeData = {
         name: newNodeName,
         description: newNodeDescription || undefined,
-        nodeType: newNodeType
+        nodeType: newNodeType,
+        layoutDirection: layoutDirection || 'horizontal'
       } as NodeData;
     }
 
@@ -101,6 +107,7 @@ export function CreateTab({ setNodes }: CreateTabProps) {
     setNewNodeType('agent');
     setNewAgentPrompt('');
     setNewToolsSelection([]);
+    setRagDataSource('');
   };
 
   return (
@@ -239,6 +246,25 @@ export function CreateTab({ setNodes }: CreateTabProps) {
                 </div>
               </div>
             )}
+            
+            {/* RAG Data Source Input */}
+            {newToolsSelection.includes('rag') && (
+              <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-md">
+                <label className="block text-sm font-medium text-purple-700 mb-2">
+                  RAG Data Source *
+                </label>
+                <input
+                  type="text"
+                  value={ragDataSource}
+                  onChange={(e) => setRagDataSource(e.target.value)}
+                  className="w-full rounded-md border border-purple-300 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="Enter data source URL or path"
+                />
+                <p className="text-xs text-purple-600 mt-1">
+                  Specify the data source for RAG (e.g., document URL, database connection, file path)
+                </p>
+              </div>
+            )}
           </div>
         )}
         
@@ -247,7 +273,8 @@ export function CreateTab({ setNodes }: CreateTabProps) {
           disabled={
             !newNodeName.trim() || 
             (newNodeType === 'agent' && !newAgentPrompt.trim()) ||
-            (newNodeType === 'tools' && newToolsSelection.length === 0)
+            (newNodeType === 'tools' && newToolsSelection.length === 0) ||
+            (newNodeType === 'tools' && newToolsSelection.includes('rag') && !ragDataSource.trim())
           }
           className="w-full bg-blue-600 text-white px-4 py-3 rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium"
         >

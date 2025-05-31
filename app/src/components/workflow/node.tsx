@@ -3,20 +3,104 @@ import { memo } from 'react';
 import { Bot, Wrench, Play, Square } from 'lucide-react';
 
 export type NodeType = 'agent' | 'tools' | 'start' | 'end';
+export type LayoutDirection = 'horizontal' | 'vertical';
 
-export type ToolType = 'tavily_search' | 'google_search' | 'human_assistance' | 'crawler';
+export type ToolType = 'tavily_search' | 'google_search' | 'human_assistance' | 'crawler' | 'rag';
 
 export const AVAILABLE_TOOLS: { value: ToolType; label: string }[] = [
   { value: 'tavily_search', label: 'Tavily Search' },
   { value: 'google_search', label: 'Google Search' },
   { value: 'human_assistance', label: 'Request Human Assistance' },
   { value: 'crawler', label: 'Crawler' },
+  { value: 'rag', label: 'RAG' },
 ];
+
+// Configuration for connection points per node type
+export interface ConnectionConfig {
+  inputs: Array<{
+    id: string;
+    position: Position;
+    style?: React.CSSProperties;
+    label?: string;
+  }>;
+  outputs: Array<{
+    id: string;
+    position: Position;
+    style?: React.CSSProperties;
+    label?: string;
+  }>;
+}
+
+// Default connection configurations for each node type based on layout direction
+const getConnectionConfig = (nodeType: NodeType, layoutDirection: LayoutDirection = 'horizontal'): ConnectionConfig => {
+  switch (nodeType) {
+    case 'start':
+      return {
+        inputs: [], // Start nodes have no inputs
+        outputs: [
+          layoutDirection === 'horizontal' 
+            ? { id: 'output', position: Position.Right }
+            : { id: 'output', position: Position.Bottom, style: { bottom: -6 } }
+        ],
+      };
+    case 'agent':
+      return {
+        inputs: [
+          layoutDirection === 'horizontal'
+            ? { id: 'input', position: Position.Left }
+            : { id: 'input', position: Position.Top, style: { top: -6 } }
+        ],
+        outputs: [
+          layoutDirection === 'horizontal'
+            ? { id: 'output', position: Position.Right, style: { right: -6 } }
+            : { id: 'output', position: Position.Bottom, style: { bottom: -6 } }
+        ],
+      };
+    case 'tools':
+      return {
+        inputs: [
+          layoutDirection === 'horizontal'
+            ? { id: 'input', position: Position.Left }
+            : { id: 'input', position: Position.Top, style: { top: -6 } }
+        ],
+        outputs: [
+          layoutDirection === 'horizontal'
+            ? { id: 'output', position: Position.Right, style: { right: -6 } }
+            : { id: 'output', position: Position.Bottom, style: { bottom: -6 } }
+        ],
+      };
+    case 'end':
+      return {
+        inputs: [
+          layoutDirection === 'horizontal'
+            ? { id: 'input', position: Position.Left }
+            : { id: 'input', position: Position.Top, style: { top: -6 } }
+        ],
+        outputs: [], // End nodes have no outputs
+      };
+    default:
+      return {
+        inputs: [
+          layoutDirection === 'horizontal'
+            ? { id: 'input', position: Position.Left }
+            : { id: 'input', position: Position.Top, style: { top: -6 } }
+        ],
+        outputs: [
+          layoutDirection === 'horizontal'
+            ? { id: 'output', position: Position.Right, style: { right: -6 } }
+            : { id: 'output', position: Position.Bottom, style: { bottom: -6 } }
+        ],
+      };
+  }
+};
 
 interface BaseNodeData {
   name: string;
   description?: string;
   nodeType: NodeType;
+  layoutDirection?: LayoutDirection;
+  // Optional custom connection configuration
+  connectionConfig?: ConnectionConfig;
   [key: string]: unknown; // Add index signature for XYFlow compatibility
 }
 
@@ -28,6 +112,7 @@ export interface AgentNodeData extends BaseNodeData {
 export interface ToolsNodeData extends BaseNodeData {
   nodeType: 'tools';
   selectedTools: ToolType[];
+  ragDataSource?: string; // Data source for RAG tool
 }
 
 export interface SystemNodeData extends BaseNodeData {
@@ -42,7 +127,7 @@ interface CustomNodeProps {
 }
 
 const getNodeStyles = (nodeType: NodeType, selected: boolean) => {
-  const baseStyles = "px-4 py-2 shadow-md rounded-md border-2 min-w-[120px] transition-all duration-200";
+  const baseStyles = "px-4 py-3 shadow-md rounded-md border-2 min-w-[140px] min-h-[80px] transition-all duration-200 relative";
   
   switch (nodeType) {
     case 'agent':
@@ -131,28 +216,40 @@ const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
   const textColor = getTextColor(data.nodeType, selected || false);
   const handleColor = getHandleColor(data.nodeType);
   const icon = getNodeIcon(data.nodeType);
+  
+  // Get connection configuration (use custom config if provided, otherwise use default with layout direction)
+  const connectionConfig = data.connectionConfig || getConnectionConfig(data.nodeType, data.layoutDirection || 'horizontal');
 
   return (
     <div className={nodeStyles}>
-      {/* Left handle (target/input) - hide for start nodes */}
-      {data.nodeType !== 'start' && (
+      {/* Render input handles */}
+      {connectionConfig.inputs.map((input) => (
         <Handle
+          key={`input-${input.id}`}
           type="target"
-          position={Position.Left}
-          id="input"
+          position={input.position}
+          id={input.id}
           className={`w-3 h-3 ${handleColor} border-2 border-white transition-colors`}
-          style={{ left: -6 }}
+          style={{
+            // Default positioning based on position
+            ...(input.position === Position.Left && { left: -6 }),
+            ...(input.position === Position.Right && { right: -6 }),
+            ...(input.position === Position.Top && { top: -6 }),
+            ...(input.position === Position.Bottom && { bottom: -6 }),
+            // Override with custom styles if provided
+            ...input.style,
+          }}
         />
-      )}
+      ))}
       
       {/* Node content */}
-      <div className="text-center">
+      <div className="text-center flex flex-col items-center justify-center h-full">
         <div className={`flex items-center justify-center gap-2 text-sm font-bold transition-colors ${textColor}`}>
           {icon}
           <span>{data.name}</span>
         </div>
         {data.description && (
-          <div className="text-xs text-gray-500 mt-1 max-w-[100px] truncate">
+          <div className="text-xs text-gray-500 mt-1 max-w-[120px] truncate">
             {data.description}
           </div>
         )}
@@ -162,16 +259,25 @@ const CustomNode = memo(({ data, selected }: CustomNodeProps) => {
         </div>
       </div>
 
-      {/* Right handle (source/output) - hide for end nodes */}
-      {data.nodeType !== 'end' && (
+      {/* Render output handles */}
+      {connectionConfig.outputs.map((output) => (
         <Handle
+          key={`output-${output.id}`}
           type="source"
-          position={Position.Right}
-          id="output"
+          position={output.position}
+          id={output.id}
           className={`w-3 h-3 ${handleColor} border-2 border-white transition-colors`}
-          style={{ right: -6 }}
+          style={{
+            // Default positioning based on position
+            ...(output.position === Position.Left && { left: -6 }),
+            ...(output.position === Position.Right && { right: -6 }),
+            ...(output.position === Position.Top && { top: -6 }),
+            ...(output.position === Position.Bottom && { bottom: -6 }),
+            // Override with custom styles if provided
+            ...output.style,
+          }}
         />
-      )}
+      ))}
     </div>
   );
 });

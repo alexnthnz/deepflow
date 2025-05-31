@@ -243,6 +243,25 @@ export function EditTab({
                         </div>
                       </div>
                     )}
+                    
+                    {/* RAG Data Source Input */}
+                    {((nodeData as ToolsNodeData).selectedTools || []).includes('rag') && (
+                      <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-md">
+                        <label className="block text-sm font-medium text-purple-700 mb-2">
+                          RAG Data Source *
+                        </label>
+                        <input
+                          type="text"
+                          value={(nodeData as ToolsNodeData).ragDataSource || ''}
+                          onChange={(e) => updateNodeData('ragDataSource', e.target.value)}
+                          className="w-full rounded-md border border-purple-300 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                          placeholder="Enter data source URL or path"
+                        />
+                        <p className="text-xs text-purple-600 mt-1">
+                          Specify the data source for RAG (e.g., document URL, database connection, file path)
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 

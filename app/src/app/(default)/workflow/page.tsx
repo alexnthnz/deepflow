@@ -23,6 +23,7 @@ import Sidebar from '@/components/workflow/sidebar';
 import { GlobalUndoNotification } from '@/components/workflow/global-undo-notification';
 import { LayoutGrid } from 'lucide-react';
 import { getLayoutedElements } from '@/lib/layout-utils';
+import { LayoutDirection } from '@/components/workflow/node';
 
 const nodeTypes = {
   custom: CustomNode,
@@ -80,10 +81,46 @@ const initialNodes: Node[] = [
 ];
 
 const initialEdges: Edge[] = [
-  { id: 'e-start-agent', source: 'start', target: 'agent', sourceHandle: 'output', targetHandle: 'input', type: 'smoothstep' },
-  { id: 'e-agent-tools', source: 'agent', target: 'tools', sourceHandle: 'output', targetHandle: 'input', type: 'smoothstep' },
-  { id: 'e-tools-agent', source: 'tools', target: 'agent', sourceHandle: 'output', targetHandle: 'input', type: 'smoothstep' },
-  { id: 'e-agent-end', source: 'agent', target: 'end', sourceHandle: 'output', targetHandle: 'input', type: 'smoothstep' },
+  { 
+    id: 'e-start-agent', 
+    source: 'start', 
+    target: 'agent', 
+    sourceHandle: 'output', 
+    targetHandle: 'input', 
+    type: 'smoothstep',
+    animated: true,
+    style: { stroke: '#6b7280', strokeWidth: 1 }
+  },
+  { 
+    id: 'e-agent-tools', 
+    source: 'agent', 
+    target: 'tools', 
+    sourceHandle: 'output', 
+    targetHandle: 'input', 
+    type: 'smoothstep',
+    animated: true,
+    style: { stroke: '#6b7280', strokeWidth: 1 }
+  },
+  { 
+    id: 'e-tools-agent', 
+    source: 'tools', 
+    target: 'agent', 
+    sourceHandle: 'output', 
+    targetHandle: 'input', 
+    type: 'smoothstep',
+    animated: true,
+    style: { stroke: '#6b7280', strokeWidth: 1 }
+  },
+  { 
+    id: 'e-agent-end', 
+    source: 'agent', 
+    target: 'end', 
+    sourceHandle: 'output', 
+    targetHandle: 'input', 
+    type: 'smoothstep',
+    animated: true,
+    style: { stroke: '#6b7280', strokeWidth: 1 }
+  },
 ];
 
 export default function WorkflowPage() {
@@ -92,6 +129,7 @@ export default function WorkflowPage() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
   const [isLayouting, setIsLayouting] = useState(false);
+  const [layoutDirection, setLayoutDirection] = useState<LayoutDirection>('horizontal');
   const reactFlowInstance = useRef<any>(null);
   
   // Undo functionality state
@@ -143,8 +181,9 @@ export default function WorkflowPage() {
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      // Ensure proper connection: source handle to target handle
-      if (connection.sourceHandle === 'output' && connection.targetHandle === 'input') {
+      // Allow connections from any source handle (output) to any target handle (input)
+      // Source handles should start with 'output' and target handles should start with 'input'
+      if (connection.sourceHandle?.startsWith('output') && connection.targetHandle?.startsWith('input')) {
         setEdges((eds) => addEdge(connection, eds));
       }
     },
@@ -152,8 +191,8 @@ export default function WorkflowPage() {
   );
 
   const isValidConnection = useCallback((connection: Connection | Edge) => {
-    // Only allow connections from output handles to input handles
-    return connection.sourceHandle === 'output' && connection.targetHandle === 'input';
+    // Allow connections from any output handle to any input handle
+    return !!(connection.sourceHandle?.startsWith('output') && connection.targetHandle?.startsWith('input'));
   }, []);
 
   const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
@@ -246,6 +285,37 @@ export default function WorkflowPage() {
     reactFlowInstance.current = instance;
   }, []);
 
+  // Update edge styles based on selection
+  useEffect(() => {
+    setEdges((eds) =>
+      eds.map((edge) => {
+        const isSelected = selectedEdge?.id === edge.id;
+        
+        return {
+          ...edge,
+          style: {
+            stroke: isSelected ? '#000000' : '#6b7280', // Black when selected, gray when not
+            strokeWidth: isSelected ? 2 : 1, // Thicker when selected
+          },
+          animated: true, // Keep animation always on
+        };
+      })
+    );
+  }, [selectedEdge, setEdges]);
+
+  // Update nodes with layout direction
+  const updateNodesLayoutDirection = useCallback((direction: LayoutDirection) => {
+    setNodes((nds) =>
+      nds.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          layoutDirection: direction,
+        },
+      }))
+    );
+  }, [setNodes]);
+
   return (
     <div className="flex w-full h-full relative" onKeyDown={onKeyDown} tabIndex={0}>
       <div className="flex-1 h-full">
@@ -261,7 +331,11 @@ export default function WorkflowPage() {
           onPaneClick={onPaneClick}
           connectionMode={ConnectionMode.Loose}
           nodeTypes={nodeTypes}
-          defaultEdgeOptions={{ type: 'smoothstep' }}
+          defaultEdgeOptions={{ 
+            type: 'smoothstep', 
+            animated: true, 
+            style: { stroke: '#6b7280', strokeWidth: 1 } 
+          }}
           onInit={onInit}
           deleteKeyCode={null} // Disable default delete behavior completely
           multiSelectionKeyCode={null} // Disable multi-selection for simplicity
@@ -297,6 +371,9 @@ export default function WorkflowPage() {
         setSelectedNode={setSelectedNode}
         setSelectedEdge={setSelectedEdge}
         onDeleteNode={handleDeleteNode}
+        layoutDirection={layoutDirection}
+        setLayoutDirection={setLayoutDirection}
+        updateNodesLayoutDirection={updateNodesLayoutDirection}
       />
 
       {/* Global Undo Notification */}

@@ -10,7 +10,7 @@ resource "aws_secretsmanager_secret_version" "lambda_secret_version" {
   # Initialize secret with JSON containing four environment variables
   secret_string = jsonencode({
     DATABASE_URL         = ""
-    AWS_REGION_NAME      = ""
+    AWS_REGION           = ""
     AWS_BEDROCK_MODEL_ID = ""
     SERPER_API_KEY       = ""
     TAVILY_API_KEY       = ""

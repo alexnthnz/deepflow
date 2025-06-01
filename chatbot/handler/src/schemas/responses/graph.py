@@ -164,4 +164,4 @@ class NodeTypeInfo(BaseModel):
 class GraphValidationResult(BaseModel):
     is_valid: bool
     errors: List[str] = []
-    warnings: List[str] = [] 
+    warnings: List[str] = []

@@ -8,16 +8,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from database.database import SessionLocal
-from database.models import (
-    AvailableTool, Graph, GraphNode, GraphEdge, NodeTool
-)
+from database.models import AvailableTool, Graph, GraphNode, GraphEdge, NodeTool
 
 logger = logging.getLogger(__name__)
 
 
 def seed_default_tools(db: Session) -> dict:
     """Seed the database with default available tools."""
-    
+
     default_tools = [
         {
             "name": "google_search",
@@ -27,14 +25,11 @@ def seed_default_tools(db: Session) -> dict:
             "schema": {
                 "type": "object",
                 "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The search query"
-                    }
+                    "query": {"type": "string", "description": "The search query"}
                 },
-                "required": ["query"]
+                "required": ["query"],
             },
-            "configuration": {}
+            "configuration": {},
         },
         {
             "name": "tavily_search",
@@ -44,41 +39,38 @@ def seed_default_tools(db: Session) -> dict:
             "schema": {
                 "type": "object",
                 "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The search query"
-                    },
+                    "query": {"type": "string", "description": "The search query"},
                     "topic": {
                         "type": "string",
                         "enum": ["general", "news", "finance"],
                         "default": "general",
-                        "description": "The topic for the search"
+                        "description": "The topic for the search",
                     },
                     "include_images": {
                         "type": "boolean",
                         "default": False,
-                        "description": "Whether to include image search results"
+                        "description": "Whether to include image search results",
                     },
                     "time_range": {
                         "type": "string",
                         "enum": ["day", "week", "month", "year"],
-                        "description": "Time range for search results"
+                        "description": "Time range for search results",
                     },
                     "search_depth": {
                         "type": "string",
                         "enum": ["basic", "advanced"],
                         "default": "basic",
-                        "description": "Depth of the search"
-                    }
+                        "description": "Depth of the search",
+                    },
                 },
-                "required": ["query"]
+                "required": ["query"],
             },
             "configuration": {
                 "max_results": 5,
                 "topic": "general",
                 "include_images": False,
-                "search_depth": "basic"
-            }
+                "search_depth": "basic",
+            },
         },
         {
             "name": "human_assistance",
@@ -90,65 +82,65 @@ def seed_default_tools(db: Session) -> dict:
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "The question or request for human assistance"
+                        "description": "The question or request for human assistance",
                     }
                 },
-                "required": ["query"]
+                "required": ["query"],
             },
-            "configuration": {
-                "timeout_seconds": 300
-            }
-        }
+            "configuration": {"timeout_seconds": 300},
+        },
     ]
-    
+
     created_tools = {}
-    
+
     for tool_data in default_tools:
         try:
             # Check if tool already exists
-            existing_tool = db.query(AvailableTool).filter(
-                AvailableTool.name == tool_data["name"]
-            ).first()
-            
+            existing_tool = (
+                db.query(AvailableTool)
+                .filter(AvailableTool.name == tool_data["name"])
+                .first()
+            )
+
             if existing_tool:
                 logger.info(f"Tool '{tool_data['name']}' already exists, skipping")
                 created_tools[tool_data["name"]] = existing_tool
                 continue
-            
+
             # Create new tool
             tool = AvailableTool(**tool_data)
             db.add(tool)
             db.commit()
             db.refresh(tool)
-            
+
             created_tools[tool_data["name"]] = tool
             logger.info(f"Created tool: {tool_data['name']}")
-            
+
         except IntegrityError as e:
             db.rollback()
             logger.warning(f"Tool '{tool_data['name']}' already exists: {e}")
             # Get the existing tool
-            existing_tool = db.query(AvailableTool).filter(
-                AvailableTool.name == tool_data["name"]
-            ).first()
+            existing_tool = (
+                db.query(AvailableTool)
+                .filter(AvailableTool.name == tool_data["name"])
+                .first()
+            )
             if existing_tool:
                 created_tools[tool_data["name"]] = existing_tool
-    
+
     return created_tools
 
 
 def seed_default_graph(db: Session, tools: dict) -> Graph:
     """Seed the database with a default graph configuration."""
-    
+
     # Check if default graph already exists
-    existing_graph = db.query(Graph).filter(
-        Graph.name == "Default Chat Graph"
-    ).first()
-    
+    existing_graph = db.query(Graph).filter(Graph.name == "Default Chat Graph").first()
+
     if existing_graph:
         logger.info("Default graph already exists, skipping")
         return existing_graph
-    
+
     try:
         # Create the default graph
         graph = Graph(
@@ -156,12 +148,12 @@ def seed_default_graph(db: Session, tools: dict) -> Graph:
             description="A simple default graph with LLM and search capabilities",
             version="1.0.0",
             is_active=True,
-            is_default=True
+            is_default=True,
         )
         db.add(graph)
         db.commit()
         db.refresh(graph)
-        
+
         # Create nodes
         nodes_data = [
             {
@@ -171,7 +163,7 @@ def seed_default_graph(db: Session, tools: dict) -> Graph:
                 "description": "Entry point",
                 "position_x": 100,
                 "position_y": 100,
-                "configuration": {}
+                "configuration": {},
             },
             {
                 "node_id": "llm",
@@ -184,8 +176,8 @@ def seed_default_graph(db: Session, tools: dict) -> Graph:
                     "model": "default",
                     "temperature": 0.7,
                     "max_tokens": 1000,
-                    "system_prompt": "You are a helpful assistant. Use tools when you need current information or to perform specific tasks."
-                }
+                    "system_prompt": "You are a helpful assistant. Use tools when you need current information or to perform specific tasks.",
+                },
             },
             {
                 "node_id": "tools",
@@ -194,7 +186,7 @@ def seed_default_graph(db: Session, tools: dict) -> Graph:
                 "description": "Execute external tools",
                 "position_x": 500,
                 "position_y": 100,
-                "configuration": {}
+                "configuration": {},
             },
             {
                 "node_id": "end",
@@ -203,29 +195,26 @@ def seed_default_graph(db: Session, tools: dict) -> Graph:
                 "description": "Exit point",
                 "position_x": 700,
                 "position_y": 100,
-                "configuration": {}
-            }
+                "configuration": {},
+            },
         ]
-        
+
         created_nodes = {}
         for node_data in nodes_data:
-            node = GraphNode(
-                graph_id=graph.id,
-                **node_data
-            )
+            node = GraphNode(graph_id=graph.id, **node_data)
             db.add(node)
             db.commit()
             db.refresh(node)
             created_nodes[node_data["node_id"]] = node
             logger.info(f"Created node: {node_data['node_id']}")
-        
+
         # Create edges
         edges_data = [
             {
                 "from_node_id": "start",
                 "to_node_id": "llm",
                 "condition_type": "always",
-                "label": "Start to LLM"
+                "label": "Start to LLM",
             },
             {
                 "from_node_id": "llm",
@@ -233,63 +222,53 @@ def seed_default_graph(db: Session, tools: dict) -> Graph:
                 "condition_type": "conditional",
                 "label": "LLM to Tools",
                 "condition_config": {
-                    "conditions": {
-                        "continue": "tools",
-                        "end": "end"
-                    },
-                    "default": "end"
-                }
+                    "conditions": {"continue": "tools", "end": "end"},
+                    "default": "end",
+                },
             },
             {
                 "from_node_id": "llm",
                 "to_node_id": "end",
                 "condition_type": "conditional",
-                "label": "LLM to End"
+                "label": "LLM to End",
             },
             {
                 "from_node_id": "tools",
                 "to_node_id": "llm",
                 "condition_type": "always",
-                "label": "Tools back to LLM"
-            }
+                "label": "Tools back to LLM",
+            },
         ]
-        
+
         for edge_data in edges_data:
-            edge = GraphEdge(
-                graph_id=graph.id,
-                **edge_data
-            )
+            edge = GraphEdge(graph_id=graph.id, **edge_data)
             db.add(edge)
             db.commit()
-            logger.info(f"Created edge: {edge_data['from_node_id']} -> {edge_data['to_node_id']}")
-        
+            logger.info(
+                f"Created edge: {edge_data['from_node_id']} -> {edge_data['to_node_id']}"
+            )
+
         # Associate tools with nodes
         llm_node = created_nodes["llm"]
         tool_node = created_nodes["tools"]
-        
+
         # Add tools to LLM node
         for tool_name, tool in tools.items():
             node_tool = NodeTool(
-                node_id=llm_node.id,
-                tool_id=tool.id,
-                tool_config={},
-                is_enabled=True
+                node_id=llm_node.id, tool_id=tool.id, tool_config={}, is_enabled=True
             )
             db.add(node_tool)
-            
+
             # Also add to tool node
             node_tool_2 = NodeTool(
-                node_id=tool_node.id,
-                tool_id=tool.id,
-                tool_config={},
-                is_enabled=True
+                node_id=tool_node.id, tool_id=tool.id, tool_config={}, is_enabled=True
             )
             db.add(node_tool_2)
-        
+
         db.commit()
         logger.info("Default graph created successfully")
         return graph
-        
+
     except IntegrityError as e:
         db.rollback()
         logger.warning(f"Default graph creation failed: {e}")
@@ -300,21 +279,21 @@ def seed_default_graph(db: Session, tools: dict) -> Graph:
 def seed_database():
     """Main function to seed the database with default data."""
     logger.info("Starting database seeding...")
-    
+
     db = SessionLocal()
     try:
         # Seed tools first
         tools = seed_default_tools(db)
         logger.info(f"Seeded {len(tools)} tools")
-        
+
         # Seed default graph
         graph = seed_default_graph(db, tools)
         if graph:
             logger.info(f"Seeded default graph: {graph.name}")
-        
+
         logger.info("Database seeding completed successfully")
         return {"status": "success", "message": "Database seeded successfully"}
-        
+
     except Exception as e:
         logger.error(f"Database seeding failed: {e}", exc_info=True)
         db.rollback()
@@ -326,9 +305,8 @@ def seed_database():
 if __name__ == "__main__":
     # Configure logging
     logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s: %(message)s"
+        level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s"
     )
-    
+
     result = seed_database()
-    print(f"Seeding result: {result}") 
+    print(f"Seeding result: {result}")

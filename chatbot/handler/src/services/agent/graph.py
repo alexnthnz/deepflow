@@ -44,11 +44,7 @@ class Graph:
 
     def __call_model(self, state: State, config: RunnableConfig):
         response = self.model.invoke(state["messages"], config)
-        return Command(
-            update={
-                "messages": [response]
-            }
-        )
+        return Command(update={"messages": [response]})
 
     @staticmethod
     def __call_tools(state: State):
@@ -204,4 +200,9 @@ class Graph:
 
         except Exception as e:
             logger.error(f"Error processing message: {e}", exc_info=True)
-            return f"Error: Failed to process message: {str(e)}", [], [], "Error Conversation"
+            return (
+                f"Error: Failed to process message: {str(e)}",
+                [],
+                [],
+                "Error Conversation",
+            )

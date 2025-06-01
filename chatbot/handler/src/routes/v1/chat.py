@@ -102,7 +102,7 @@ async def get_chat(
                 db_file = file_repo.get_file_by_id(msg.file_id)
                 if db_file:
                     file_key = db_file.file_url.split(
-                        f"{config.AWS_S3_BUCKET}.s3.{config.AWS_REGION_NAME}.amazonaws.com/"
+                        f"{config.AWS_S3_BUCKET}.s3.{config.AWS_REGION}.amazonaws.com/"
                     )[-1]
                     message_response.file.file_url = generate_presigned_url(
                         file_key, expires_in=3600

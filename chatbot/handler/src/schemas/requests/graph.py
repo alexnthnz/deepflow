@@ -82,6 +82,7 @@ class NodeToolUpdate(BaseModel):
 
 class GraphBulkCreate(BaseModel):
     """Create a complete graph with nodes and edges in one request"""
+
     graph: GraphCreate
     nodes: List[GraphNodeCreate]
     edges: List[GraphEdgeCreate]
@@ -90,4 +91,4 @@ class GraphBulkCreate(BaseModel):
 class GraphExecutionCreate(BaseModel):
     chat_id: Optional[uuid.UUID] = None
     session_id: Optional[str] = None
-    execution_metadata: Dict[str, Any] = Field(default_factory=dict) 
+    execution_metadata: Dict[str, Any] = Field(default_factory=dict)

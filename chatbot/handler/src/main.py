@@ -4,8 +4,11 @@ import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from config.config import config
+from config.redis_client import check_redis_connection
 from database import database
 from routes.v1 import api_v1
+from utils.functions import mask_sensitive
 
 # Configure logging for Lambda with explicit CloudWatch compatibility
 logging.basicConfig(
@@ -40,6 +43,26 @@ app.add_middleware(
 @app.get("/health")
 def health_check():
     """Health check endpoint."""
+    sensitive_keys = [
+        "SERPER_API_KEY",
+        "TAVILY_API_KEY",
+    ]
+
+    config_vars = {}
+    for attr_name in dir(config):
+        # Only include properties (exclude methods and private attributes)
+        if not attr_name.startswith("_") and isinstance(
+            getattr(config.__class__, attr_name, None), property
+        ):
+            try:
+                value = getattr(config, attr_name)
+                # Mask sensitive values
+                if attr_name in sensitive_keys:
+                    value = mask_sensitive(str(value))
+                config_vars[attr_name] = value
+            except Exception as e:
+                config_vars[attr_name] = f"Error: {str(e)}"
+
     return {
         "status": "ok",
         "message": "Service is running.",
@@ -48,6 +71,8 @@ def health_check():
             "message": "Database connection is healthy.",
             "tables": database.list_tables(),
         },
+        "redis": check_redis_connection(),
+        "config": config_vars,
     }
 
 

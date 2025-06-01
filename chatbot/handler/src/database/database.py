@@ -62,10 +62,11 @@ def migrate_db():
         Base.metadata.create_all(bind=engine)
         PostgresChatMessageHistory.create_tables(sync_connection, "chat_history")
         logger.info("Database migrations applied successfully")
-        
+
         # Seed the database with default data
         try:
             from database.seed_data import seed_database
+
             seed_result = seed_database()
             if seed_result["status"] == "success":
                 logger.info("Database seeding completed successfully")
@@ -73,7 +74,7 @@ def migrate_db():
                 logger.warning(f"Database seeding had issues: {seed_result['message']}")
         except Exception as e:
             logger.warning(f"Database seeding failed, but migration succeeded: {e}")
-        
+
         return {"status": "success", "detail": "Migrations applied and database seeded"}
     except Exception as e:
         logger.error(f"Migration error: {e}", exc_info=True)

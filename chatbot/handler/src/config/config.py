@@ -1,8 +1,8 @@
 import os
 import json
 import logging
-import boto3
 from botocore.exceptions import ClientError
+import boto3
 
 # Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
@@ -11,229 +11,67 @@ logger = logging.getLogger(__name__)
 
 class AppConfig:
     def __init__(self):
-        self._client = boto3.client("secretsmanager", region_name="ap-southeast-2")
-        self._secret_arn = os.environ["SECRET_ARN"]
+        self._is_local = os.getenv("ENV") == "local"
+        if not self._is_local:
+            self._client = boto3.client("secretsmanager", region_name="ap-southeast-2")
+            self._secret_arn = os.environ["SECRET_ARN"]
+
+    def _get_secret_value(self, key):
+        if self._is_local:
+            value = os.getenv(key)
+            if value is None:
+                logger.error(f"Environment variable {key} not found")
+                raise KeyError(f"Environment variable {key} not found")
+            return value
+        try:
+            resp = self._client.get_secret_value(SecretId=self._secret_arn)
+            secret = json.loads(resp["SecretString"])
+            if key not in secret:
+                logger.error(f"Key {key} not found in secret")
+                raise KeyError(f"Key {key} not found in secret")
+            return secret[key]
+        except ClientError as e:
+            logger.error(f"Secrets Manager error: {e}")
+            raise
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.error(f"Invalid secret: {e}")
+            raise
 
     @property
     def DATABASE_URL(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["DATABASE_URL"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
+        return self._get_secret_value("DATABASE_URL")
 
     @property
-    def AWS_REGION_NAME(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["AWS_REGION_NAME"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
+    def AWS_REGION(self):
+        return self._get_secret_value("AWS_REGION")
 
     @property
     def AWS_BEDROCK_MODEL_ID(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["AWS_BEDROCK_MODEL_ID"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
+        return self._get_secret_value("AWS_BEDROCK_MODEL_ID")
 
     @property
     def SERPER_API_KEY(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["SERPER_API_KEY"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
+        return self._get_secret_value("SERPER_API_KEY")
 
     @property
     def TAVILY_API_KEY(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["TAVILY_API_KEY"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
-
-    @property
-    def JWT_ACCESS_SECRET(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["JWT_ACCESS_SECRET"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
-
-    @property
-    def JWT_REFRESH_SECRET(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["JWT_REFRESH_SECRET"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
-
-    @property
-    def JWT_ALGORITHM(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["JWT_ALGORITHM"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
-
-    @property
-    def JWT_AUDIENCE(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["JWT_AUDIENCE"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
-
-    @property
-    def JWT_ISSUER(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["JWT_ISSUER"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
+        return self._get_secret_value("TAVILY_API_KEY")
 
     @property
     def REDIS_HOST(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["REDIS_HOST"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
+        return self._get_secret_value("REDIS_HOST")
 
     @property
     def REDIS_PORT(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["REDIS_PORT"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
+        return self._get_secret_value("REDIS_PORT")
 
     @property
     def REDIS_DB(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["REDIS_DB"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
+        return self._get_secret_value("REDIS_DB")
 
     @property
     def AWS_S3_BUCKET(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["AWS_S3_BUCKET"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
-
-    @property
-    def GOOGLE_CLIENT_ID(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["GOOGLE_CLIENT_ID"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
-
-    @property
-    def GOOGLE_CLIENT_SECRET(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["GOOGLE_CLIENT_SECRET"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
-
-    @property
-    def GOOGLE_REDIRECT_URI(self):
-        try:
-            resp = self._client.get_secret_value(SecretId=self._secret_arn)
-            secret = json.loads(resp["SecretString"])
-            return secret["GOOGLE_REDIRECT_URI"]
-        except ClientError as e:
-            logger.error(f"Secrets Manager error: {e}")
-            raise
-        except (json.JSONDecodeError, KeyError) as e:
-            logger.error(f"Invalid secret: {e}")
-            raise
+        return self._get_secret_value("AWS_S3_BUCKET")
 
 
 config = AppConfig()

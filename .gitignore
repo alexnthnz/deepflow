@@ -25,6 +25,8 @@ chatbot/**/__pycache__
 
 MODULE.bazel.lock
 .env
+env.json
 
 dist/
 .image_tag
+.aws-sam/

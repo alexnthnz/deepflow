@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Resources:
+  MyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: src.lambda_handler.handler
+      Runtime: python3.13
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          ENV: local
+          DATABASE_URL: ${env:DATABASE_URL}
+          AWS_REGION: ${env:AWS_REGION}
+          AWS_BEDROCK_MODEL_ID: ${env:AWS_BEDROCK_MODEL_ID}
+          SERPER_API_KEY: ${env:SERPER_API_KEY}
+          TAVILY_API_KEY: ${env:TAVILY_API_KEY}
+          REDIS_HOST: ${env:REDIS_HOST}
+          REDIS_PORT: ${env:REDIS_PORT}
+          REDIS_DB: ${env:REDIS_DB}
+          AWS_S3_BUCKET: ${env:AWS_S3_BUCKET}
+          AWS_ACCESS_KEY_ID: ${env:AWS_ACCESS_KEY_ID}
+          AWS_SECRET_ACCESS_KEY: ${env:AWS_SECRET_ACCESS_KEY}
+      Events:
+        HealthApi:
+          Type: Api
+          Properties:
+            Path: /health
+            Method: GET
+        MessagesApi:
+          Type: Api
+          Properties:
+            Path: /api/v1/chats/messages
+            Method: POST
+    Metadata:
+      Dockerfile: ./Dockerfile
+      DockerContext: .
+      DockerTag: latest

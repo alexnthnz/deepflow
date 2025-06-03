@@ -144,6 +144,61 @@ terraform plan -out=tfplan -target="module.handler"
 terraform apply tfplan
 ```
 
+## Local Development
+
+For local development, you can run the backend services locally without deploying to AWS:
+
+### Step 1: Start Database and Redis Containers
+
+```bash
+# Navigate to the chatbot directory
+cd chatbot
+
+# Start database and Redis containers
+docker compose up -d
+```
+
+### Step 2: Setup Handler Environment
+
+```bash
+# Navigate to the handler directory
+cd handler
+
+# Create environment configuration file
+cp env.example.json env.json
+# Edit env.json with your local configuration values
+```
+
+### Step 3: Setup Python Virtual Environment
+
+```bash
+# Activate existing virtual environment (if available)
+source venv/bin/activate
+
+# Or create a new virtual environment if running for the first time
+python -m venv venv
+source venv/bin/activate
+```
+
+### Step 4: Install AWS SAM CLI
+
+```bash
+# Install AWS SAM CLI using pip in the virtual environment
+pip install aws-sam-cli
+```
+
+### Step 5: Build and Run Local API
+
+```bash
+# Build the SAM application
+sam build
+
+# Start the local API server
+sam local start-api --template .aws-sam/build/template.yaml --docker-network llmtoolflow_default --env-vars env.json --port 3000
+```
+
+The local API will be available at `http://localhost:3000`. You can now test your backend services locally before deploying to AWS.
+
 ## Architecture
 
 The system uses several AWS services:

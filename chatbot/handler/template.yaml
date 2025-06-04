@@ -24,17 +24,13 @@ Resources:
           AWS_ACCESS_KEY_ID: ${env:AWS_ACCESS_KEY_ID}
           AWS_SECRET_ACCESS_KEY: ${env:AWS_SECRET_ACCESS_KEY}
       Events:
-        HealthApi:
+        Api:
           Type: Api
           Properties:
-            Path: /health
-            Method: GET
-        MessagesApi:
-          Type: Api
-          Properties:
-            Path: /api/v1/chats/messages
-            Method: POST
+            Path: /{proxy+}
+            Method: ANY
     Metadata:
       Dockerfile: ./Dockerfile
       DockerContext: .
       DockerTag: latest
+

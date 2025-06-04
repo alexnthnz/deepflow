@@ -57,16 +57,26 @@ class AvailableToolCreate(BaseModel):
     display_name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     tool_type: Literal["search", "api", "function", "human"]
-    schema: Dict[str, Any] = Field(..., description="JSON schema for tool input/output")
+    schema_: Dict[str, Any] = Field(
+        ...,
+        alias="schema",
+        description="JSON schema for tool input/output",
+    )
     configuration: Dict[str, Any] = Field(default_factory=dict)
+
+    class Config:
+        populate_by_name = True
 
 
 class AvailableToolUpdate(BaseModel):
     display_name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
-    schema: Optional[Dict[str, Any]] = None
+    schema_: Optional[Dict[str, Any]] = Field(None, alias="schema")
     configuration: Optional[Dict[str, Any]] = None
     is_enabled: Optional[bool] = None
+
+    class Config:
+        populate_by_name = True
 
 
 class NodeToolCreate(BaseModel):

@@ -50,13 +50,14 @@ class AvailableToolInDB(BaseModel):
     display_name: str
     description: Optional[str]
     tool_type: str
-    schema: Dict[str, Any]
+    schema_: Dict[str, Any] = Field(alias="schema")
     configuration: Dict[str, Any]
     is_enabled: bool
     created_at: datetime
 
     class Config:
         from_attributes = True
+        populate_by_name = True
 
 
 class NodeToolInDB(BaseModel):

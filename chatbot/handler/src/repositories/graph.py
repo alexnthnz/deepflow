@@ -1,7 +1,9 @@
 from typing import List, Optional, Dict, Any
+import uuid
+
+from fastapi import Depends
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, func, desc
-import uuid
 
 from database.database import get_db
 from database.models import (
@@ -235,7 +237,7 @@ class ToolRepository:
 
     # Available Tool CRUD operations
     def create_tool(self, tool_data: AvailableToolCreate) -> AvailableTool:
-        db_tool = AvailableTool(**tool_data.dict())
+        db_tool = AvailableTool(**tool_data.dict(by_alias=True))
         self.db.add(db_tool)
         self.db.commit()
         self.db.refresh(db_tool)
@@ -262,7 +264,7 @@ class ToolRepository:
         if not db_tool:
             return None
 
-        update_data = tool_data.dict(exclude_unset=True)
+        update_data = tool_data.dict(exclude_unset=True, by_alias=True)
         for field, value in update_data.items():
             setattr(db_tool, field, value)
 
@@ -399,15 +401,18 @@ class GraphExecutionRepository:
 
 
 # Dependency injection functions
-def get_graph_repository(db: Session = next(get_db())) -> GraphRepository:
+def get_graph_repository(db: Session = Depends(get_db)) -> GraphRepository:
+    """Provide GraphRepository with a request-scoped DB session."""
     return GraphRepository(db)
 
 
-def get_tool_repository(db: Session = next(get_db())) -> ToolRepository:
+def get_tool_repository(db: Session = Depends(get_db)) -> ToolRepository:
+    """Provide ToolRepository with a request-scoped DB session."""
     return ToolRepository(db)
 
 
 def get_graph_execution_repository(
-    db: Session = next(get_db()),
+    db: Session = Depends(get_db),
 ) -> GraphExecutionRepository:
+    """Provide GraphExecutionRepository with a request-scoped DB session."""
     return GraphExecutionRepository(db)

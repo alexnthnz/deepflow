@@ -194,7 +194,7 @@ pip install aws-sam-cli
 sam build
 
 # Start the local API server
-sam local start-api --template .aws-sam/build/template.yaml --docker-network llmtoolflow_default --env-vars env.json --port 3000
+sam local start-api --template .aws-sam/build/template.yaml --docker-network llmtoolflow_default --env-vars env.json --port 3000 --warm-containers EAGER
 ```
 
 The local API will be available at `http://localhost:3000`. You can now test your backend services locally before deploying to AWS.

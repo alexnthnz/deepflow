@@ -13,7 +13,7 @@ from repositories.chat import get_chat_repository, ChatRepository
 from repositories.message import get_message_repository, MessageRepository
 from repositories.file import get_file_repository, FileRepository
 from repositories.tag import get_tag_repository, TagRepository
-from schemas.requests.chat import ChatCreate, TagCreate
+from schemas.requests.chat import TagCreate
 from schemas.responses.chat import ChatInDB, ChatDetailInDB, MessageInDB, TagInDB
 from schemas.responses.common import CommonResponse
 from database.models import SenderType
@@ -54,7 +54,7 @@ async def list_chats(
         return CommonResponse(
             message="Chats retrieved successfully",
             status_code=status.HTTP_200_OK,
-            data=[ChatInDB.from_orm(chat).dict() for chat in chats],
+            data=[ChatInDB.model_validate(chat).model_dump() for chat in chats],
             error=None,
             meta=meta,
         )
@@ -66,7 +66,7 @@ async def list_chats(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -89,15 +89,15 @@ async def get_chat(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Chat does not exist or belongs to another user",
-                ).dict(),
+                ).model_dump(),
             )
 
         messages = message_repo.get_messages_by_chat(db_chat)[offset : offset + limit]
-        chat_response = ChatDetailInDB.from_orm(db_chat)
+        chat_response = ChatDetailInDB.model_validate(db_chat)
         chat_response.messages = []
 
         for msg in messages:
-            message_response = MessageInDB.from_orm(msg)
+            message_response = MessageInDB.model_validate(msg)
             if msg.file_id:
                 db_file = file_repo.get_file_by_id(msg.file_id)
                 if db_file:
@@ -112,7 +112,7 @@ async def get_chat(
         return CommonResponse(
             message="Chat details retrieved successfully",
             status_code=status.HTTP_200_OK,
-            data=chat_response.dict(),
+            data=chat_response.model_dump(),
             error=None,
         )
     except Exception as e:
@@ -123,7 +123,7 @@ async def get_chat(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -142,7 +142,7 @@ async def delete_chat(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Chat does not exist or belongs to another user",
-                ).dict(),
+                ).model_dump(),
             )
         return CommonResponse(
             message="Chat deleted successfully",
@@ -158,7 +158,7 @@ async def delete_chat(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -185,7 +185,7 @@ async def send_message_auth(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Chat does not exist or belongs to another user",
-                ).dict(),
+                ).model_dump(),
             )
 
         # Handle file upload
@@ -208,7 +208,7 @@ async def send_message_auth(
                         status_code=e.status_code,
                         data=None,
                         error=e.detail,
-                    ).dict(),
+                    ).model_dump(),
                 )
 
         # Create user message
@@ -236,13 +236,13 @@ async def send_message_auth(
                         status_code=e.status_code,
                         data=None,
                         error=e.detail,
-                    ).dict(),
+                    ).model_dump(),
                 )
 
         return CommonResponse(
             message="Message sent successfully",
             status_code=status.HTTP_201_CREATED,
-            data=MessageInDB.from_orm(db_message).dict(),
+            data=MessageInDB.model_validate(db_message).model_dump(),
             error=None,
         )
     except Exception as e:
@@ -253,7 +253,7 @@ async def send_message_auth(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -278,7 +278,7 @@ async def add_tag(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Chat does not exist or belongs to another user",
-                ).dict(),
+                ).model_dump(),
             )
 
         db_tag = tag_repo.create_tag(tag.name)
@@ -286,7 +286,7 @@ async def add_tag(
         return CommonResponse(
             message="Tag added to chat successfully",
             status_code=status.HTTP_201_CREATED,
-            data=TagInDB.from_orm(db_tag).dict(),
+            data=TagInDB.model_validate(db_tag).model_dump(),
             error=None,
         )
     except Exception as e:
@@ -297,7 +297,7 @@ async def add_tag(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -321,7 +321,7 @@ async def remove_tag(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Chat does not exist or belongs to another user",
-                ).dict(),
+                ).model_dump(),
             )
 
         db_tag = tag_repo.get_tag_by_id(tag_id)
@@ -333,7 +333,7 @@ async def remove_tag(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Tag does not exist or belongs to another user",
-                ).dict(),
+                ).model_dump(),
             )
 
         tag_repo.remove_tag_from_chat(chat_id, tag_id)
@@ -351,7 +351,7 @@ async def remove_tag(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 

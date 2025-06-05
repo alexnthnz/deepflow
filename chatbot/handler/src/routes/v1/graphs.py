@@ -37,7 +37,7 @@ async def list_graphs(
         return CommonResponse(
             message="Graphs retrieved successfully",
             status_code=status.HTTP_200_OK,
-            data=[GraphInDB.from_orm(g).dict() for g in graphs],
+            data=[GraphInDB.model_validate(g).model_dump() for g in graphs],
             error=None,
         )
     except Exception as e:
@@ -49,7 +49,7 @@ async def list_graphs(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -63,7 +63,7 @@ async def create_graph(
         return CommonResponse(
             message="Graph created successfully",
             status_code=status.HTTP_201_CREATED,
-            data=GraphInDB.from_orm(db_graph).dict(),
+            data=GraphInDB.model_validate(db_graph).model_dump(),
             error=None,
         )
     except Exception as e:
@@ -75,7 +75,7 @@ async def create_graph(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -94,17 +94,17 @@ async def get_graph(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Graph does not exist",
-                ).dict(),
+                ).model_dump(),
             )
 
-        graph_resp = GraphDetailInDB.from_orm(db_graph)
-        graph_resp.nodes = [GraphNodeDetailInDB.from_orm(n) for n in db_graph.nodes]
-        graph_resp.edges = [GraphEdgeInDB.from_orm(e) for e in db_graph.edges]
+        graph_resp = GraphDetailInDB.model_validate(db_graph)
+        graph_resp.nodes = [GraphNodeDetailInDB.model_validate(n) for n in db_graph.nodes]
+        graph_resp.edges = [GraphEdgeInDB.model_validate(e) for e in db_graph.edges]
 
         return CommonResponse(
             message="Graph retrieved successfully",
             status_code=status.HTTP_200_OK,
-            data=graph_resp.dict(),
+            data=graph_resp.model_dump(),
             error=None,
         )
     except Exception as e:
@@ -116,7 +116,7 @@ async def get_graph(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -136,12 +136,12 @@ async def update_graph(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Graph does not exist",
-                ).dict(),
+                ).model_dump(),
             )
         return CommonResponse(
             message="Graph updated successfully",
             status_code=status.HTTP_200_OK,
-            data=GraphInDB.from_orm(db_graph).dict(),
+            data=GraphInDB.model_validate(db_graph).model_dump(),
             error=None,
         )
     except Exception as e:
@@ -153,11 +153,11 @@ async def update_graph(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
-@router.delete("/{graph_id}", response_model=CommonResponse, status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{graph_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_graph(
     graph_id: uuid.UUID,
     graph_repo: GraphRepository = Depends(get_graph_repository),
@@ -172,7 +172,7 @@ async def delete_graph(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Graph does not exist",
-                ).dict(),
+                ).model_dump(),
             )
         return CommonResponse(
             message="Graph deleted successfully",
@@ -189,7 +189,7 @@ async def delete_graph(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -203,7 +203,7 @@ async def list_nodes(
         return CommonResponse(
             message="Nodes retrieved successfully",
             status_code=status.HTTP_200_OK,
-            data=[GraphNodeDetailInDB.from_orm(n).dict() for n in nodes],
+            data=[GraphNodeDetailInDB.model_validate(n).model_dump() for n in nodes],
             error=None,
         )
     except Exception as e:
@@ -215,7 +215,7 @@ async def list_nodes(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -235,12 +235,12 @@ async def create_node(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Graph does not exist",
-                ).dict(),
+                ).model_dump(),
             )
         return CommonResponse(
             message="Node created successfully",
             status_code=status.HTTP_201_CREATED,
-            data=GraphNodeDetailInDB.from_orm(db_node).dict(),
+            data=GraphNodeDetailInDB.model_validate(db_node).model_dump(),
             error=None,
         )
     except Exception as e:
@@ -252,7 +252,7 @@ async def create_node(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -272,12 +272,12 @@ async def get_node(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Node does not exist",
-                ).dict(),
+                ).model_dump(),
             )
         return CommonResponse(
             message="Node retrieved successfully",
             status_code=status.HTTP_200_OK,
-            data=GraphNodeDetailInDB.from_orm(db_node).dict(),
+            data=GraphNodeDetailInDB.model_validate(db_node).model_dump(),
             error=None,
         )
     except Exception as e:
@@ -289,7 +289,7 @@ async def get_node(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -310,13 +310,13 @@ async def update_node(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Node does not exist",
-                ).dict(),
+                ).model_dump(),
             )
         updated_node = graph_repo.update_node(node_id, node_update)
         return CommonResponse(
             message="Node updated successfully",
             status_code=status.HTTP_200_OK,
-            data=GraphNodeDetailInDB.from_orm(updated_node).dict(),
+            data=GraphNodeDetailInDB.model_validate(updated_node).model_dump(),
             error=None,
         )
     except Exception as e:
@@ -328,11 +328,11 @@ async def update_node(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
-@router.delete("/{graph_id}/nodes/{node_id}", response_model=CommonResponse, status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{graph_id}/nodes/{node_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_node(
     graph_id: uuid.UUID,
     node_id: uuid.UUID,
@@ -348,7 +348,7 @@ async def delete_node(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Node does not exist",
-                ).dict(),
+                ).model_dump(),
             )
         graph_repo.delete_node(node_id)
         return CommonResponse(
@@ -366,7 +366,7 @@ async def delete_node(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -380,7 +380,7 @@ async def list_edges(
         return CommonResponse(
             message="Edges retrieved successfully",
             status_code=status.HTTP_200_OK,
-            data=[GraphEdgeInDB.from_orm(e).dict() for e in edges],
+            data=[GraphEdgeInDB.model_validate(e).model_dump() for e in edges],
             error=None,
         )
     except Exception as e:
@@ -392,7 +392,7 @@ async def list_edges(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -412,12 +412,12 @@ async def create_edge(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Invalid graph or node reference",
-                ).dict(),
+                ).model_dump(),
             )
         return CommonResponse(
             message="Edge created successfully",
             status_code=status.HTTP_201_CREATED,
-            data=GraphEdgeInDB.from_orm(db_edge).dict(),
+            data=GraphEdgeInDB.model_validate(db_edge).model_dump(),
             error=None,
         )
     except Exception as e:
@@ -429,7 +429,7 @@ async def create_edge(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -449,12 +449,12 @@ async def get_edge(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Edge does not exist",
-                ).dict(),
+                ).model_dump(),
             )
         return CommonResponse(
             message="Edge retrieved successfully",
             status_code=status.HTTP_200_OK,
-            data=GraphEdgeInDB.from_orm(db_edge).dict(),
+            data=GraphEdgeInDB.model_validate(db_edge).model_dump(),
             error=None,
         )
     except Exception as e:
@@ -466,7 +466,7 @@ async def get_edge(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
@@ -487,13 +487,13 @@ async def update_edge(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Edge does not exist",
-                ).dict(),
+                ).model_dump(),
             )
         updated_edge = graph_repo.update_edge(edge_id, edge_update)
         return CommonResponse(
             message="Edge updated successfully",
             status_code=status.HTTP_200_OK,
-            data=GraphEdgeInDB.from_orm(updated_edge).dict(),
+            data=GraphEdgeInDB.model_validate(updated_edge).model_dump(),
             error=None,
         )
     except Exception as e:
@@ -505,11 +505,11 @@ async def update_edge(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )
 
 
-@router.delete("/{graph_id}/edges/{edge_id}", response_model=CommonResponse, status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{graph_id}/edges/{edge_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_edge(
     graph_id: uuid.UUID,
     edge_id: uuid.UUID,
@@ -525,7 +525,7 @@ async def delete_edge(
                     status_code=status.HTTP_404_NOT_FOUND,
                     data=None,
                     error="Edge does not exist",
-                ).dict(),
+                ).model_dump(),
             )
         graph_repo.delete_edge(edge_id)
         return CommonResponse(
@@ -543,5 +543,5 @@ async def delete_edge(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
-            ).dict(),
+            ).model_dump(),
         )

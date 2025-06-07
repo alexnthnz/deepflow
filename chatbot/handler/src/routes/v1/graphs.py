@@ -98,7 +98,9 @@ async def get_graph(
             )
 
         graph_resp = GraphDetailInDB.model_validate(db_graph)
-        graph_resp.nodes = [GraphNodeDetailInDB.model_validate(n) for n in db_graph.nodes]
+        graph_resp.nodes = [
+            GraphNodeDetailInDB.model_validate(n) for n in db_graph.nodes
+        ]
         graph_resp.edges = [GraphEdgeInDB.model_validate(e) for e in db_graph.edges]
 
         return CommonResponse(
@@ -219,7 +221,11 @@ async def list_nodes(
         )
 
 
-@router.post("/{graph_id}/nodes", response_model=CommonResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{graph_id}/nodes",
+    response_model=CommonResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_node(
     graph_id: uuid.UUID,
     node: GraphNodeCreate,
@@ -396,7 +402,11 @@ async def list_edges(
         )
 
 
-@router.post("/{graph_id}/edges", response_model=CommonResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{graph_id}/edges",
+    response_model=CommonResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_edge(
     graph_id: uuid.UUID,
     edge: GraphEdgeCreate,

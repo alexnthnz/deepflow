@@ -90,36 +90,12 @@ class ChatTag(Base):
 
 
 # Dynamic Graph Configuration Models
-class Graph(Base):
-    __tablename__ = "graphs"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    name = Column(String(255), nullable=False)
-    description = Column(String, nullable=True)
-    version = Column(String(50), default="1.0.0")
-    is_active = Column(Boolean, default=False)
-    is_default = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
-
-    # Relationships
-    nodes = relationship(
-        "GraphNode", back_populates="graph", cascade="all, delete-orphan"
-    )
-    edges = relationship(
-        "GraphEdge", back_populates="graph", cascade="all, delete-orphan"
-    )
-    executions = relationship("GraphExecution", back_populates="graph")
-
+# Removed Graph table since app only has 1 graph at a time
 
 class GraphNode(Base):
     __tablename__ = "graph_nodes"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    graph_id = Column(
-        UUID(as_uuid=True), ForeignKey("graphs.id"), nullable=False, index=True
-    )
-    node_id = Column(String(100), nullable=False)  # unique within graph
+    node_id = Column(String(100), nullable=False, unique=True)  # unique globally now
     node_type = Column(
         String(50), nullable=False
     )  # 'llm', 'tool', 'condition', 'human', 'start', 'end'
@@ -134,23 +110,14 @@ class GraphNode(Base):
     )
 
     # Relationships
-    graph = relationship("Graph", back_populates="nodes")
     tools = relationship(
         "NodeTool", back_populates="node", cascade="all, delete-orphan"
-    )
-
-    # Unique constraint
-    __table_args__ = (
-        Index("ix_graph_node_unique", "graph_id", "node_id", unique=True),
     )
 
 
 class GraphEdge(Base):
     __tablename__ = "graph_edges"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    graph_id = Column(
-        UUID(as_uuid=True), ForeignKey("graphs.id"), nullable=False, index=True
-    )
     from_node_id = Column(String(100), nullable=False)
     to_node_id = Column(String(100), nullable=False)
     condition_type = Column(
@@ -160,8 +127,10 @@ class GraphEdge(Base):
     label = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    # Relationships
-    graph = relationship("Graph", back_populates="edges")
+    # Unique constraint to prevent duplicate edges
+    __table_args__ = (
+        Index("ix_edge_unique", "from_node_id", "to_node_id", unique=True),
+    )
 
 
 class AvailableTool(Base):
@@ -203,9 +172,6 @@ class NodeTool(Base):
 class GraphExecution(Base):
     __tablename__ = "graph_executions"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    graph_id = Column(
-        UUID(as_uuid=True), ForeignKey("graphs.id"), nullable=False, index=True
-    )
     chat_id = Column(
         UUID(as_uuid=True), ForeignKey("chats.id"), nullable=True, index=True
     )
@@ -219,7 +185,6 @@ class GraphExecution(Base):
     execution_metadata = Column(JSON, default={})
 
     # Relationships
-    graph = relationship("Graph", back_populates="executions")
     chat = relationship("Chat")
     node_executions = relationship(
         "NodeExecution", back_populates="execution", cascade="all, delete-orphan"

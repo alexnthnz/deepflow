@@ -3,20 +3,6 @@ from pydantic import BaseModel, Field
 import uuid
 
 
-class GraphCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
-    version: str = Field(default="1.0.0", max_length=50)
-
-
-class GraphUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-    description: Optional[str] = None
-    version: Optional[str] = Field(None, max_length=50)
-    is_active: Optional[bool] = None
-    is_default: Optional[bool] = None
-
-
 class NodePosition(BaseModel):
     x: int = Field(default=0)
     y: int = Field(default=0)
@@ -88,14 +74,6 @@ class NodeToolCreate(BaseModel):
 class NodeToolUpdate(BaseModel):
     tool_config: Optional[Dict[str, Any]] = None
     is_enabled: Optional[bool] = None
-
-
-class GraphBulkCreate(BaseModel):
-    """Create a complete graph with nodes and edges in one request"""
-
-    graph: GraphCreate
-    nodes: List[GraphNodeCreate]
-    edges: List[GraphEdgeCreate]
 
 
 class GraphExecutionCreate(BaseModel):

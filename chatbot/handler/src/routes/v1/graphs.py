@@ -6,8 +6,6 @@ from fastapi.responses import JSONResponse
 
 from repositories.graph import get_graph_repository, GraphRepository
 from schemas.requests.graph import (
-    GraphCreate,
-    GraphUpdate,
     GraphNodeCreate,
     GraphNodeUpdate,
     GraphEdgeCreate,
@@ -15,8 +13,6 @@ from schemas.requests.graph import (
 )
 from schemas.responses.common import CommonResponse
 from schemas.responses.graph import (
-    GraphInDB,
-    GraphDetailInDB,
     GraphNodeDetailInDB,
     GraphEdgeInDB,
 )
@@ -25,27 +21,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# Graph Overview Endpoint
 @router.get("/", response_model=CommonResponse)
-async def list_graphs(
+async def get_graph_overview(
     graph_repo: GraphRepository = Depends(get_graph_repository),
-    limit: int = 50,
-    offset: int = 0,
-    is_active: bool | None = None,
 ):
+    """Get the complete graph structure with all nodes and edges."""
     try:
-        graphs = graph_repo.get_graphs(limit=limit, offset=offset, is_active=is_active)
+        nodes = graph_repo.get_all_nodes()
+        edges = graph_repo.get_all_edges()
+        
         return CommonResponse(
-            message="Graphs retrieved successfully",
+            message="Graph overview retrieved successfully",
             status_code=status.HTTP_200_OK,
-            data=[GraphInDB.model_validate(g).model_dump() for g in graphs],
+            data={
+                "nodes": [GraphNodeDetailInDB.model_validate(n).model_dump() for n in nodes],
+                "edges": [GraphEdgeInDB.model_validate(e).model_dump() for e in edges],
+            },
             error=None,
         )
     except Exception as e:
-        logger.error(f"Error retrieving graphs: {e}")
+        logger.error(f"Error retrieving graph overview: {e}")
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content=CommonResponse(
-                message="Failed to retrieve graphs",
+                message="Failed to retrieve graph overview",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 data=None,
                 error=str(e),
@@ -53,155 +53,14 @@ async def list_graphs(
         )
 
 
-@router.post("/", response_model=CommonResponse, status_code=status.HTTP_201_CREATED)
-async def create_graph(
-    graph: GraphCreate,
-    graph_repo: GraphRepository = Depends(get_graph_repository),
-):
-    try:
-        db_graph = graph_repo.create_graph(graph)
-        return CommonResponse(
-            message="Graph created successfully",
-            status_code=status.HTTP_201_CREATED,
-            data=GraphInDB.model_validate(db_graph).model_dump(),
-            error=None,
-        )
-    except Exception as e:
-        logger.error(f"Error creating graph: {e}")
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=CommonResponse(
-                message="Failed to create graph",
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                data=None,
-                error=str(e),
-            ).model_dump(),
-        )
-
-
-@router.get("/{graph_id}", response_model=CommonResponse)
-async def get_graph(
-    graph_id: uuid.UUID,
-    graph_repo: GraphRepository = Depends(get_graph_repository),
-):
-    try:
-        db_graph = graph_repo.get_graph_with_details(graph_id)
-        if not db_graph:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content=CommonResponse(
-                    message="Graph not found",
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    data=None,
-                    error="Graph does not exist",
-                ).model_dump(),
-            )
-
-        graph_resp = GraphDetailInDB.model_validate(db_graph)
-        graph_resp.nodes = [
-            GraphNodeDetailInDB.model_validate(n) for n in db_graph.nodes
-        ]
-        graph_resp.edges = [GraphEdgeInDB.model_validate(e) for e in db_graph.edges]
-
-        return CommonResponse(
-            message="Graph retrieved successfully",
-            status_code=status.HTTP_200_OK,
-            data=graph_resp.model_dump(),
-            error=None,
-        )
-    except Exception as e:
-        logger.error(f"Error retrieving graph: {e}")
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=CommonResponse(
-                message="Failed to retrieve graph",
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                data=None,
-                error=str(e),
-            ).model_dump(),
-        )
-
-
-@router.put("/{graph_id}", response_model=CommonResponse)
-async def update_graph(
-    graph_id: uuid.UUID,
-    graph_update: GraphUpdate,
-    graph_repo: GraphRepository = Depends(get_graph_repository),
-):
-    try:
-        db_graph = graph_repo.update_graph(graph_id, graph_update)
-        if not db_graph:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content=CommonResponse(
-                    message="Graph not found",
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    data=None,
-                    error="Graph does not exist",
-                ).model_dump(),
-            )
-        return CommonResponse(
-            message="Graph updated successfully",
-            status_code=status.HTTP_200_OK,
-            data=GraphInDB.model_validate(db_graph).model_dump(),
-            error=None,
-        )
-    except Exception as e:
-        logger.error(f"Error updating graph: {e}")
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=CommonResponse(
-                message="Failed to update graph",
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                data=None,
-                error=str(e),
-            ).model_dump(),
-        )
-
-
-@router.delete("/{graph_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_graph(
-    graph_id: uuid.UUID,
-    graph_repo: GraphRepository = Depends(get_graph_repository),
-):
-    try:
-        deleted = graph_repo.delete_graph(graph_id)
-        if not deleted:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content=CommonResponse(
-                    message="Graph not found",
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    data=None,
-                    error="Graph does not exist",
-                ).model_dump(),
-            )
-        return CommonResponse(
-            message="Graph deleted successfully",
-            status_code=status.HTTP_204_NO_CONTENT,
-            data=None,
-            error=None,
-        )
-    except Exception as e:
-        logger.error(f"Error deleting graph: {e}")
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content=CommonResponse(
-                message="Failed to delete graph",
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                data=None,
-                error=str(e),
-            ).model_dump(),
-        )
-
-
-@router.get("/{graph_id}/nodes", response_model=CommonResponse)
+# Node Endpoints
+@router.get("/nodes", response_model=CommonResponse)
 async def list_nodes(
-    graph_id: uuid.UUID,
     graph_repo: GraphRepository = Depends(get_graph_repository),
 ):
+    """List all nodes in the graph."""
     try:
-        nodes = graph_repo.get_nodes_by_graph(graph_id)
+        nodes = graph_repo.get_all_nodes()
         return CommonResponse(
             message="Nodes retrieved successfully",
             status_code=status.HTTP_200_OK,
@@ -221,28 +80,14 @@ async def list_nodes(
         )
 
 
-@router.post(
-    "/{graph_id}/nodes",
-    response_model=CommonResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/nodes", response_model=CommonResponse, status_code=status.HTTP_201_CREATED)
 async def create_node(
-    graph_id: uuid.UUID,
     node: GraphNodeCreate,
     graph_repo: GraphRepository = Depends(get_graph_repository),
 ):
+    """Create a new node in the graph."""
     try:
-        db_node = graph_repo.create_node(graph_id, node)
-        if not db_node:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content=CommonResponse(
-                    message="Graph not found",
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    data=None,
-                    error="Graph does not exist",
-                ).model_dump(),
-            )
+        db_node = graph_repo.create_node(node)
         return CommonResponse(
             message="Node created successfully",
             status_code=status.HTTP_201_CREATED,
@@ -262,15 +107,15 @@ async def create_node(
         )
 
 
-@router.get("/{graph_id}/nodes/{node_id}", response_model=CommonResponse)
+@router.get("/nodes/{node_id}", response_model=CommonResponse)
 async def get_node(
-    graph_id: uuid.UUID,
     node_id: uuid.UUID,
     graph_repo: GraphRepository = Depends(get_graph_repository),
 ):
+    """Get a specific node by ID."""
     try:
         db_node = graph_repo.get_node_by_id(node_id)
-        if not db_node or db_node.graph_id != graph_id:
+        if not db_node:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
                 content=CommonResponse(
@@ -299,16 +144,53 @@ async def get_node(
         )
 
 
-@router.put("/{graph_id}/nodes/{node_id}", response_model=CommonResponse)
+@router.get("/nodes/by-node-id/{node_id}", response_model=CommonResponse)
+async def get_node_by_node_id(
+    node_id: str,
+    graph_repo: GraphRepository = Depends(get_graph_repository),
+):
+    """Get a specific node by its node_id string."""
+    try:
+        db_node = graph_repo.get_node_by_node_id(node_id)
+        if not db_node:
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content=CommonResponse(
+                    message="Node not found",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    data=None,
+                    error="Node does not exist",
+                ).model_dump(),
+            )
+        return CommonResponse(
+            message="Node retrieved successfully",
+            status_code=status.HTTP_200_OK,
+            data=GraphNodeDetailInDB.model_validate(db_node).model_dump(),
+            error=None,
+        )
+    except Exception as e:
+        logger.error(f"Error retrieving node: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content=CommonResponse(
+                message="Failed to retrieve node",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                data=None,
+                error=str(e),
+            ).model_dump(),
+        )
+
+
+@router.put("/nodes/{node_id}", response_model=CommonResponse)
 async def update_node(
-    graph_id: uuid.UUID,
     node_id: uuid.UUID,
     node_update: GraphNodeUpdate,
     graph_repo: GraphRepository = Depends(get_graph_repository),
 ):
+    """Update a node."""
     try:
         db_node = graph_repo.get_node_by_id(node_id)
-        if not db_node or db_node.graph_id != graph_id:
+        if not db_node:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
                 content=CommonResponse(
@@ -338,15 +220,15 @@ async def update_node(
         )
 
 
-@router.delete("/{graph_id}/nodes/{node_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/nodes/{node_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_node(
-    graph_id: uuid.UUID,
     node_id: uuid.UUID,
     graph_repo: GraphRepository = Depends(get_graph_repository),
 ):
+    """Delete a node."""
     try:
         db_node = graph_repo.get_node_by_id(node_id)
-        if not db_node or db_node.graph_id != graph_id:
+        if not db_node:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
                 content=CommonResponse(
@@ -376,13 +258,14 @@ async def delete_node(
         )
 
 
-@router.get("/{graph_id}/edges", response_model=CommonResponse)
+# Edge Endpoints
+@router.get("/edges", response_model=CommonResponse)
 async def list_edges(
-    graph_id: uuid.UUID,
     graph_repo: GraphRepository = Depends(get_graph_repository),
 ):
+    """List all edges in the graph."""
     try:
-        edges = graph_repo.get_edges_by_graph(graph_id)
+        edges = graph_repo.get_all_edges()
         return CommonResponse(
             message="Edges retrieved successfully",
             status_code=status.HTTP_200_OK,
@@ -402,28 +285,14 @@ async def list_edges(
         )
 
 
-@router.post(
-    "/{graph_id}/edges",
-    response_model=CommonResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/edges", response_model=CommonResponse, status_code=status.HTTP_201_CREATED)
 async def create_edge(
-    graph_id: uuid.UUID,
     edge: GraphEdgeCreate,
     graph_repo: GraphRepository = Depends(get_graph_repository),
 ):
+    """Create a new edge in the graph."""
     try:
-        db_edge = graph_repo.create_edge(graph_id, edge)
-        if not db_edge:
-            return JSONResponse(
-                status_code=status.HTTP_404_NOT_FOUND,
-                content=CommonResponse(
-                    message="Graph or nodes not found",
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    data=None,
-                    error="Invalid graph or node reference",
-                ).model_dump(),
-            )
+        db_edge = graph_repo.create_edge(edge)
         return CommonResponse(
             message="Edge created successfully",
             status_code=status.HTTP_201_CREATED,
@@ -443,15 +312,15 @@ async def create_edge(
         )
 
 
-@router.get("/{graph_id}/edges/{edge_id}", response_model=CommonResponse)
+@router.get("/edges/{edge_id}", response_model=CommonResponse)
 async def get_edge(
-    graph_id: uuid.UUID,
     edge_id: uuid.UUID,
     graph_repo: GraphRepository = Depends(get_graph_repository),
 ):
+    """Get a specific edge by ID."""
     try:
         db_edge = graph_repo.get_edge_by_id(edge_id)
-        if not db_edge or db_edge.graph_id != graph_id:
+        if not db_edge:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
                 content=CommonResponse(
@@ -480,16 +349,16 @@ async def get_edge(
         )
 
 
-@router.put("/{graph_id}/edges/{edge_id}", response_model=CommonResponse)
+@router.put("/edges/{edge_id}", response_model=CommonResponse)
 async def update_edge(
-    graph_id: uuid.UUID,
     edge_id: uuid.UUID,
     edge_update: GraphEdgeUpdate,
     graph_repo: GraphRepository = Depends(get_graph_repository),
 ):
+    """Update an edge."""
     try:
         db_edge = graph_repo.get_edge_by_id(edge_id)
-        if not db_edge or db_edge.graph_id != graph_id:
+        if not db_edge:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
                 content=CommonResponse(
@@ -519,15 +388,15 @@ async def update_edge(
         )
 
 
-@router.delete("/{graph_id}/edges/{edge_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/edges/{edge_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_edge(
-    graph_id: uuid.UUID,
     edge_id: uuid.UUID,
     graph_repo: GraphRepository = Depends(get_graph_repository),
 ):
+    """Delete an edge."""
     try:
         db_edge = graph_repo.get_edge_by_id(edge_id)
-        if not db_edge or db_edge.graph_id != graph_id:
+        if not db_edge:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
                 content=CommonResponse(

@@ -1,6 +1,7 @@
 """
 Database seeding script for dynamic graph configuration.
-This script populates the database with default tools and a sample graph.
+This script populates the database with default tools and graph nodes/edges.
+Since the app only has one graph, we don't create a graph table - just nodes and edges.
 """
 
 import logging
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from database.database import SessionLocal
-from database.models import AvailableTool, Graph, GraphNode, GraphEdge, NodeTool
+from database.models import AvailableTool, GraphNode, GraphEdge, NodeTool
 
 logger = logging.getLogger(__name__)
 
@@ -131,29 +132,16 @@ def seed_default_tools(db: Session) -> dict:
     return created_tools
 
 
-def seed_default_graph(db: Session, tools: dict) -> Graph:
-    """Seed the database with a default graph configuration."""
+def seed_default_graph_components(db: Session, tools: dict):
+    """Seed the database with default graph nodes and edges."""
 
-    # Check if default graph already exists
-    existing_graph = db.query(Graph).filter(Graph.name == "Default Chat Graph").first()
-
-    if existing_graph:
-        logger.info("Default graph already exists, skipping")
-        return existing_graph
+    # Check if default nodes already exist
+    existing_nodes = db.query(GraphNode).all()
+    if existing_nodes:
+        logger.info("Graph nodes already exist, skipping graph seeding")
+        return True
 
     try:
-        # Create the default graph
-        graph = Graph(
-            name="Default Chat Graph",
-            description="A simple default graph with LLM and search capabilities",
-            version="1.0.0",
-            is_active=True,
-            is_default=True,
-        )
-        db.add(graph)
-        db.commit()
-        db.refresh(graph)
-
         # Create nodes
         nodes_data = [
             {
@@ -201,7 +189,7 @@ def seed_default_graph(db: Session, tools: dict) -> Graph:
 
         created_nodes = {}
         for node_data in nodes_data:
-            node = GraphNode(graph_id=graph.id, **node_data)
+            node = GraphNode(**node_data)
             db.add(node)
             db.commit()
             db.refresh(node)
@@ -241,7 +229,7 @@ def seed_default_graph(db: Session, tools: dict) -> Graph:
         ]
 
         for edge_data in edges_data:
-            edge = GraphEdge(graph_id=graph.id, **edge_data)
+            edge = GraphEdge(**edge_data)
             db.add(edge)
             db.commit()
             logger.info(
@@ -266,14 +254,13 @@ def seed_default_graph(db: Session, tools: dict) -> Graph:
             db.add(node_tool_2)
 
         db.commit()
-        logger.info("Default graph created successfully")
-        return graph
+        logger.info("Default graph components created successfully")
+        return True
 
     except IntegrityError as e:
         db.rollback()
-        logger.warning(f"Default graph creation failed: {e}")
-        # Return existing graph if it was created in the meantime
-        return db.query(Graph).filter(Graph.name == "Default Chat Graph").first()
+        logger.warning(f"Default graph components creation failed: {e}")
+        return False
 
 
 def seed_database():
@@ -286,10 +273,10 @@ def seed_database():
         tools = seed_default_tools(db)
         logger.info(f"Seeded {len(tools)} tools")
 
-        # Seed default graph
-        graph = seed_default_graph(db, tools)
-        if graph:
-            logger.info(f"Seeded default graph: {graph.name}")
+        # Seed default graph components
+        success = seed_default_graph_components(db, tools)
+        if success:
+            logger.info("Seeded default graph components")
 
         logger.info("Database seeding completed successfully")
         return {"status": "success", "message": "Database seeded successfully"}

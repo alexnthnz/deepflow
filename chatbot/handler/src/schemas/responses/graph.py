@@ -11,7 +11,6 @@ class NodePositionInDB(BaseModel):
 
 class GraphNodeInDB(BaseModel):
     id: uuid.UUID
-    graph_id: uuid.UUID
     node_id: str
     node_type: str
     name: str
@@ -32,7 +31,6 @@ class GraphNodeInDB(BaseModel):
 
 class GraphEdgeInDB(BaseModel):
     id: uuid.UUID
-    graph_id: uuid.UUID
     from_node_id: str
     to_node_id: str
     condition_type: Optional[str]
@@ -72,28 +70,6 @@ class NodeToolInDB(BaseModel):
         from_attributes = True
 
 
-class GraphInDB(BaseModel):
-    id: uuid.UUID
-    name: str
-    description: Optional[str]
-    version: str
-    is_active: bool
-    is_default: bool
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class GraphDetailInDB(GraphInDB):
-    nodes: List[GraphNodeInDB] = []
-    edges: List[GraphEdgeInDB] = []
-
-    class Config:
-        from_attributes = True
-
-
 class GraphNodeDetailInDB(GraphNodeInDB):
     tools: List[NodeToolInDB] = []
 
@@ -121,7 +97,6 @@ class NodeExecutionInDB(BaseModel):
 
 class GraphExecutionInDB(BaseModel):
     id: uuid.UUID
-    graph_id: uuid.UUID
     chat_id: Optional[uuid.UUID]
     session_id: Optional[str]
     status: str
@@ -136,21 +111,15 @@ class GraphExecutionInDB(BaseModel):
 
 class GraphExecutionDetailInDB(GraphExecutionInDB):
     node_executions: List[NodeExecutionInDB] = []
-    graph: Optional[GraphInDB] = None
 
     class Config:
         from_attributes = True
 
 
-class GraphStats(BaseModel):
-    total_graphs: int
-    active_graphs: int
-    total_executions: int
-    successful_executions: int
-    failed_executions: int
-    avg_execution_time_ms: Optional[float]
-    total_tokens_used: int
-    total_cost_usd: float
+class GraphOverview(BaseModel):
+    """Complete graph structure with nodes and edges"""
+    nodes: List[GraphNodeDetailInDB]
+    edges: List[GraphEdgeInDB]
 
 
 class NodeTypeInfo(BaseModel):

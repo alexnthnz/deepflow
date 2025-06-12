@@ -173,31 +173,26 @@ cp env.example.json env.json
 
 ```bash
 # Activate existing virtual environment (if available)
-source venv/bin/activate
+source .venv/bin/activate
 
 # Or create a new virtual environment if running for the first time
-python -m venv venv
-source venv/bin/activate
+uv venv --python 3.13
+source .venv/bin/activate
 ```
 
-### Step 4: Install AWS SAM CLI
+### Step 4: Install dependencies
 
 ```bash
-# Install AWS SAM CLI using pip in the virtual environment
-pip install aws-sam-cli
+uv sync --group dev
 ```
 
 ### Step 5: Build and Run Local API
 
 ```bash
-# Build the SAM application
-sam build
-
-# Start the local API server
-sam local start-api --template .aws-sam/build/template.yaml --docker-network llmtoolflow_default --env-vars env.json --port 3000 --warm-containers EAGER
+uv run uvicorn src.main:app --reload --env-file .env
 ```
 
-The local API will be available at `http://localhost:3000`. You can now test your backend services locally before deploying to AWS.
+The local API will be available at `http://localhost:8000`. You can now test your backend services locally before deploying to AWS.
 
 ## Architecture
 

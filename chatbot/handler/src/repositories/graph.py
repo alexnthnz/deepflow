@@ -7,7 +7,6 @@ from sqlalchemy import and_, func, desc
 
 from database.database import get_db
 from database.models import (
-    Graph,
     GraphNode,
     GraphEdge,
     AvailableTool,
@@ -16,8 +15,6 @@ from database.models import (
     NodeExecution,
 )
 from schemas.requests.graph import (
-    GraphCreate,
-    GraphUpdate,
     GraphNodeCreate,
     GraphNodeUpdate,
     GraphEdgeCreate,
@@ -34,88 +31,18 @@ class GraphRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    # Graph CRUD operations
-    def create_graph(self, graph_data: GraphCreate) -> Graph:
-        db_graph = Graph(**graph_data.dict())
-        self.db.add(db_graph)
-        self.db.commit()
-        self.db.refresh(db_graph)
-        return db_graph
-
-    def get_graph_by_id(self, graph_id: uuid.UUID) -> Optional[Graph]:
-        return self.db.query(Graph).filter(Graph.id == graph_id).first()
-
-    def get_graph_with_details(self, graph_id: uuid.UUID) -> Optional[Graph]:
+    # Node CRUD operations
+    def get_all_nodes(self) -> List[GraphNode]:
+        """Get all nodes in the graph."""
         return (
-            self.db.query(Graph)
-            .options(
-                joinedload(Graph.nodes)
-                .joinedload(GraphNode.tools)
-                .joinedload(NodeTool.tool),
-                joinedload(Graph.edges),
-            )
-            .filter(Graph.id == graph_id)
-            .first()
+            self.db.query(GraphNode)
+            .options(joinedload(GraphNode.tools).joinedload(NodeTool.tool))
+            .all()
         )
 
-    def get_graphs(
-        self, limit: int = 50, offset: int = 0, is_active: Optional[bool] = None
-    ) -> List[Graph]:
-        query = self.db.query(Graph)
-        if is_active is not None:
-            query = query.filter(Graph.is_active == is_active)
-        return query.order_by(desc(Graph.updated_at)).offset(offset).limit(limit).all()
-
-    def update_graph(
-        self, graph_id: uuid.UUID, graph_data: GraphUpdate
-    ) -> Optional[Graph]:
-        db_graph = self.get_graph_by_id(graph_id)
-        if not db_graph:
-            return None
-
-        update_data = graph_data.dict(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(db_graph, field, value)
-
-        self.db.commit()
-        self.db.refresh(db_graph)
-        return db_graph
-
-    def delete_graph(self, graph_id: uuid.UUID) -> bool:
-        db_graph = self.get_graph_by_id(graph_id)
-        if not db_graph:
-            return False
-
-        self.db.delete(db_graph)
-        self.db.commit()
-        return True
-
-    def set_default_graph(self, graph_id: uuid.UUID) -> bool:
-        # First, unset all other default graphs
-        self.db.query(Graph).update({Graph.is_default: False})
-
-        # Set the specified graph as default
-        db_graph = self.get_graph_by_id(graph_id)
-        if not db_graph:
-            return False
-
-        db_graph.is_default = True
-        self.db.commit()
-        return True
-
-    def get_default_graph(self) -> Optional[Graph]:
-        return self.db.query(Graph).filter(Graph.is_default == True).first()
-
-    # Node CRUD operations
-    def create_node(
-        self, graph_id: uuid.UUID, node_data: GraphNodeCreate
-    ) -> Optional[GraphNode]:
-        # Check if graph exists
-        if not self.get_graph_by_id(graph_id):
-            return None
-
+    def create_node(self, node_data: GraphNodeCreate) -> GraphNode:
+        """Create a new node in the graph."""
         db_node = GraphNode(
-            graph_id=graph_id,
             node_id=node_data.node_id,
             node_type=node_data.node_type,
             name=node_data.name,
@@ -131,28 +58,27 @@ class GraphRepository:
         return db_node
 
     def get_node_by_id(self, node_id: uuid.UUID) -> Optional[GraphNode]:
-        return self.db.query(GraphNode).filter(GraphNode.id == node_id).first()
-
-    def get_node_by_graph_and_node_id(
-        self, graph_id: uuid.UUID, node_id: str
-    ) -> Optional[GraphNode]:
-        return (
-            self.db.query(GraphNode)
-            .filter(and_(GraphNode.graph_id == graph_id, GraphNode.node_id == node_id))
-            .first()
-        )
-
-    def get_nodes_by_graph(self, graph_id: uuid.UUID) -> List[GraphNode]:
+        """Get a node by its UUID."""
         return (
             self.db.query(GraphNode)
             .options(joinedload(GraphNode.tools).joinedload(NodeTool.tool))
-            .filter(GraphNode.graph_id == graph_id)
-            .all()
+            .filter(GraphNode.id == node_id)
+            .first()
+        )
+
+    def get_node_by_node_id(self, node_id: str) -> Optional[GraphNode]:
+        """Get a node by its node_id string."""
+        return (
+            self.db.query(GraphNode)
+            .options(joinedload(GraphNode.tools).joinedload(NodeTool.tool))
+            .filter(GraphNode.node_id == node_id)
+            .first()
         )
 
     def update_node(
         self, node_id: uuid.UUID, node_data: GraphNodeUpdate
     ) -> Optional[GraphNode]:
+        """Update a node."""
         db_node = self.get_node_by_id(node_id)
         if not db_node:
             return None
@@ -171,6 +97,7 @@ class GraphRepository:
         return db_node
 
     def delete_node(self, node_id: uuid.UUID) -> bool:
+        """Delete a node."""
         db_node = self.get_node_by_id(node_id)
         if not db_node:
             return False
@@ -180,20 +107,20 @@ class GraphRepository:
         return True
 
     # Edge CRUD operations
-    def create_edge(
-        self, graph_id: uuid.UUID, edge_data: GraphEdgeCreate
-    ) -> Optional[GraphEdge]:
-        # Check if graph exists and nodes exist
-        if not self.get_graph_by_id(graph_id):
+    def get_all_edges(self) -> List[GraphEdge]:
+        """Get all edges in the graph."""
+        return self.db.query(GraphEdge).all()
+
+    def create_edge(self, edge_data: GraphEdgeCreate) -> Optional[GraphEdge]:
+        """Create a new edge in the graph."""
+        # Check if nodes exist
+        from_node = self.get_node_by_node_id(edge_data.from_node_id)
+        to_node = self.get_node_by_node_id(edge_data.to_node_id)
+
+        if not from_node or not to_node:
             return None
 
-        if not self.get_node_by_graph_and_node_id(graph_id, edge_data.from_node_id):
-            return None
-
-        if not self.get_node_by_graph_and_node_id(graph_id, edge_data.to_node_id):
-            return None
-
-        db_edge = GraphEdge(graph_id=graph_id, **edge_data.dict())
+        db_edge = GraphEdge(**edge_data.dict())
 
         self.db.add(db_edge)
         self.db.commit()
@@ -201,14 +128,13 @@ class GraphRepository:
         return db_edge
 
     def get_edge_by_id(self, edge_id: uuid.UUID) -> Optional[GraphEdge]:
+        """Get an edge by its UUID."""
         return self.db.query(GraphEdge).filter(GraphEdge.id == edge_id).first()
-
-    def get_edges_by_graph(self, graph_id: uuid.UUID) -> List[GraphEdge]:
-        return self.db.query(GraphEdge).filter(GraphEdge.graph_id == graph_id).all()
 
     def update_edge(
         self, edge_id: uuid.UUID, edge_data: GraphEdgeUpdate
     ) -> Optional[GraphEdge]:
+        """Update an edge."""
         db_edge = self.get_edge_by_id(edge_id)
         if not db_edge:
             return None
@@ -222,6 +148,7 @@ class GraphRepository:
         return db_edge
 
     def delete_edge(self, edge_id: uuid.UUID) -> bool:
+        """Delete an edge."""
         db_edge = self.get_edge_by_id(edge_id)
         if not db_edge:
             return False
@@ -345,10 +272,9 @@ class GraphExecutionRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_execution(
-        self, graph_id: uuid.UUID, execution_data: GraphExecutionCreate
-    ) -> GraphExecution:
-        db_execution = GraphExecution(graph_id=graph_id, **execution_data.dict())
+    def create_execution(self, execution_data: GraphExecutionCreate) -> GraphExecution:
+        """Create a new graph execution (without graph_id since there's only one graph)."""
+        db_execution = GraphExecution(**execution_data.dict())
 
         self.db.add(db_execution)
         self.db.commit()
@@ -356,22 +282,33 @@ class GraphExecutionRepository:
         return db_execution
 
     def get_execution_by_id(self, execution_id: uuid.UUID) -> Optional[GraphExecution]:
+        """Get an execution by its UUID."""
         return (
             self.db.query(GraphExecution)
-            .options(
-                joinedload(GraphExecution.node_executions),
-                joinedload(GraphExecution.graph),
-            )
+            .options(joinedload(GraphExecution.node_executions))
             .filter(GraphExecution.id == execution_id)
             .first()
         )
 
-    def get_executions_by_graph(
-        self, graph_id: uuid.UUID, limit: int = 50, offset: int = 0
+    def get_all_executions(
+        self, limit: int = 50, offset: int = 0
     ) -> List[GraphExecution]:
+        """Get all graph executions."""
         return (
             self.db.query(GraphExecution)
-            .filter(GraphExecution.graph_id == graph_id)
+            .order_by(desc(GraphExecution.started_at))
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+    def get_executions_by_chat(
+        self, chat_id: uuid.UUID, limit: int = 50, offset: int = 0
+    ) -> List[GraphExecution]:
+        """Get executions for a specific chat."""
+        return (
+            self.db.query(GraphExecution)
+            .filter(GraphExecution.chat_id == chat_id)
             .order_by(desc(GraphExecution.started_at))
             .offset(offset)
             .limit(limit)
@@ -381,6 +318,7 @@ class GraphExecutionRepository:
     def update_execution_status(
         self, execution_id: uuid.UUID, status: str, error_message: Optional[str] = None
     ) -> Optional[GraphExecution]:
+        """Update execution status."""
         db_execution = (
             self.db.query(GraphExecution)
             .filter(GraphExecution.id == execution_id)

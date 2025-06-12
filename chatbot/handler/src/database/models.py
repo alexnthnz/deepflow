@@ -92,6 +92,7 @@ class ChatTag(Base):
 # Dynamic Graph Configuration Models
 # Removed Graph table since app only has 1 graph at a time
 
+
 class GraphNode(Base):
     __tablename__ = "graph_nodes"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)

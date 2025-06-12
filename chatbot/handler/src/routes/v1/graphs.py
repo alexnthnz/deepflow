@@ -30,12 +30,14 @@ async def get_graph_overview(
     try:
         nodes = graph_repo.get_all_nodes()
         edges = graph_repo.get_all_edges()
-        
+
         return CommonResponse(
             message="Graph overview retrieved successfully",
             status_code=status.HTTP_200_OK,
             data={
-                "nodes": [GraphNodeDetailInDB.model_validate(n).model_dump() for n in nodes],
+                "nodes": [
+                    GraphNodeDetailInDB.model_validate(n).model_dump() for n in nodes
+                ],
                 "edges": [GraphEdgeInDB.model_validate(e).model_dump() for e in edges],
             },
             error=None,
@@ -80,7 +82,9 @@ async def list_nodes(
         )
 
 
-@router.post("/nodes", response_model=CommonResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/nodes", response_model=CommonResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_node(
     node: GraphNodeCreate,
     graph_repo: GraphRepository = Depends(get_graph_repository),
@@ -285,7 +289,9 @@ async def list_edges(
         )
 
 
-@router.post("/edges", response_model=CommonResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/edges", response_model=CommonResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_edge(
     edge: GraphEdgeCreate,
     graph_repo: GraphRepository = Depends(get_graph_repository),

@@ -118,6 +118,7 @@ class GraphExecutionDetailInDB(GraphExecutionInDB):
 
 class GraphOverview(BaseModel):
     """Complete graph structure with nodes and edges"""
+
     nodes: List[GraphNodeDetailInDB]
     edges: List[GraphEdgeInDB]
 

@@ -1,6 +1,5 @@
 import logging
 import uuid
-import base64
 
 from fastapi import Depends, status, UploadFile, File, Form, HTTPException, APIRouter
 from fastapi.responses import JSONResponse

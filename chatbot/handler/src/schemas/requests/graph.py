@@ -1,6 +1,7 @@
 from typing import Optional, List, Dict, Any, Literal
 from pydantic import BaseModel, Field
 import uuid
+from datetime import datetime
 
 
 class NodePosition(BaseModel):
@@ -80,3 +81,26 @@ class GraphExecutionCreate(BaseModel):
     chat_id: Optional[uuid.UUID] = None
     session_id: Optional[str] = None
     execution_metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class NodeExecutionCreate(BaseModel):
+    node_id: uuid.UUID
+    status: str = Field(default="pending")
+    input_data: Optional[Dict[str, Any]] = None
+    output_data: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+    execution_time_ms: Optional[int] = None
+    tokens_used: int = Field(default=0)
+    cost_usd: int = Field(default=0)
+
+
+class NodeExecutionUpdate(BaseModel):
+    status: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    input_data: Optional[Dict[str, Any]] = None
+    output_data: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+    execution_time_ms: Optional[int] = None
+    tokens_used: Optional[int] = None
+    cost_usd: Optional[int] = None

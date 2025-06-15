@@ -127,6 +127,9 @@ class GraphEdge(Base):
     condition_config = Column(JSON, default={})
     label = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # Unique constraint to prevent duplicate edges
     __table_args__ = (
@@ -147,6 +150,9 @@ class AvailableTool(Base):
     configuration = Column(JSON, default={})  # default config
     is_enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # Relationships
     node_tools = relationship("NodeTool", back_populates="tool")
@@ -161,6 +167,10 @@ class NodeTool(Base):
     )
     tool_config = Column(JSON, default={})  # node-specific tool config
     is_enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # Relationships
     node = relationship("GraphNode", back_populates="tools")
@@ -201,7 +211,9 @@ class NodeExecution(Base):
         nullable=False,
         index=True,
     )
-    node_id = Column(String(100), nullable=False)
+    node_id = Column(
+        UUID(as_uuid=True), ForeignKey("graph_nodes.id"), nullable=False, index=True
+    )
     status = Column(
         String(50), default="pending"
     )  # 'pending', 'running', 'completed', 'failed', 'skipped'
@@ -218,3 +230,4 @@ class NodeExecution(Base):
 
     # Relationships
     execution = relationship("GraphExecution", back_populates="node_executions")
+    node = relationship("GraphNode")

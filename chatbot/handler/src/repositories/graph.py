@@ -3,7 +3,7 @@ import uuid
 
 from fastapi import Depends
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, func, desc
+from sqlalchemy import func, desc
 
 from database.database import get_db
 from database.models import (
@@ -24,6 +24,8 @@ from schemas.requests.graph import (
     NodeToolCreate,
     NodeToolUpdate,
     GraphExecutionCreate,
+    NodeExecutionCreate,
+    NodeExecutionUpdate,
 )
 
 
@@ -336,6 +338,68 @@ class GraphExecutionRepository:
         self.db.commit()
         self.db.refresh(db_execution)
         return db_execution
+
+    # NodeExecution CRUD operations
+    def create_node_execution(
+        self, execution_id: uuid.UUID, node_id: uuid.UUID, **kwargs
+    ) -> NodeExecution:
+        """Create a new node execution."""
+        db_node_execution = NodeExecution(
+            execution_id=execution_id, node_id=node_id, **kwargs
+        )
+        self.db.add(db_node_execution)
+        self.db.commit()
+        self.db.refresh(db_node_execution)
+        return db_node_execution
+
+    def get_node_execution_by_id(
+        self, node_execution_id: uuid.UUID
+    ) -> Optional[NodeExecution]:
+        """Get a node execution by its UUID."""
+        return (
+            self.db.query(NodeExecution)
+            .options(joinedload(NodeExecution.node))
+            .filter(NodeExecution.id == node_execution_id)
+            .first()
+        )
+
+    def get_node_executions_by_execution(
+        self, execution_id: uuid.UUID
+    ) -> List[NodeExecution]:
+        """Get all node executions for a specific graph execution."""
+        return (
+            self.db.query(NodeExecution)
+            .options(joinedload(NodeExecution.node))
+            .filter(NodeExecution.execution_id == execution_id)
+            .order_by(NodeExecution.started_at)
+            .all()
+        )
+
+    def update_node_execution(
+        self, node_execution_id: uuid.UUID, **kwargs
+    ) -> Optional[NodeExecution]:
+        """Update a node execution."""
+        db_node_execution = self.get_node_execution_by_id(node_execution_id)
+        if not db_node_execution:
+            return None
+
+        for field, value in kwargs.items():
+            if hasattr(db_node_execution, field):
+                setattr(db_node_execution, field, value)
+
+        self.db.commit()
+        self.db.refresh(db_node_execution)
+        return db_node_execution
+
+    def delete_node_execution(self, node_execution_id: uuid.UUID) -> bool:
+        """Delete a node execution."""
+        db_node_execution = self.get_node_execution_by_id(node_execution_id)
+        if not db_node_execution:
+            return False
+
+        self.db.delete(db_node_execution)
+        self.db.commit()
+        return True
 
 
 # Dependency injection functions

@@ -80,7 +80,7 @@ class GraphNodeDetailInDB(GraphNodeInDB):
 class NodeExecutionInDB(BaseModel):
     id: uuid.UUID
     execution_id: uuid.UUID
-    node_id: str
+    node_id: uuid.UUID
     status: str
     started_at: Optional[datetime]
     completed_at: Optional[datetime]

@@ -21,9 +21,11 @@ import '@xyflow/react/dist/style.css';
 import CustomNode from '@/components/workflow/node';
 import Sidebar from '@/components/workflow/sidebar';
 import { GlobalUndoNotification } from '@/components/workflow/global-undo-notification';
-import { LayoutGrid } from 'lucide-react';
+import { LayoutGrid, Save, Download, Play, AlertTriangle } from 'lucide-react';
 import { getLayoutedElements } from '@/lib/layout-utils';
 import { LayoutDirection } from '@/components/workflow/node';
+import { useWorkflow } from '@/hooks/use-workflow';
+import { Button } from '@/components/ui/button';
 
 const nodeTypes = {
   custom: CustomNode,
@@ -136,26 +138,50 @@ export default function WorkflowPage() {
   const [deletedNodeData, setDeletedNodeData] = useState<DeletedNodeData | null>(null);
   const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Apply initial layout on mount
+  // Backend integration
+  const workflow = useWorkflow();
+  const [showExecutionPanel, setShowExecutionPanel] = useState(false);
+  const [executionInput, setExecutionInput] = useState('');
+  const [executionResult, setExecutionResult] = useState<any>(null);
+
+  // Load workflow from backend on mount
   useEffect(() => {
-    const applyInitialLayout = async () => {
-      try {
-        const { nodes: layoutedNodes, edges: layoutedEdges } = await getLayoutedElements(initialNodes, initialEdges);
-        setNodes(layoutedNodes);
-        setEdges(layoutedEdges);
-        // Center the view after layout is applied
-        setTimeout(() => {
-          if (reactFlowInstance.current) {
-            reactFlowInstance.current.fitView({ padding: 0.1, duration: 800 });
-          }
-        }, 100);
-      } catch (error) {
-        console.error('Initial layout failed:', error);
+    const loadFromBackend = async () => {
+      const workflowData = await workflow.load();
+      
+      if (workflowData && workflowData.nodes.length > 0) {
+        // Use loaded workflow
+        setNodes(workflowData.nodes);
+        setEdges(workflowData.edges);
+      } else {
+        // Use initial layout if no saved workflow
+        try {
+          const { nodes: layoutedNodes, edges: layoutedEdges } = await getLayoutedElements(initialNodes, initialEdges);
+          setNodes(layoutedNodes);
+          setEdges(layoutedEdges);
+        } catch (error) {
+          console.error('Initial layout failed:', error);
+        }
       }
+      
+      // Center the view after layout is applied
+      setTimeout(() => {
+        if (reactFlowInstance.current) {
+          reactFlowInstance.current.fitView({ padding: 0.1, duration: 800 });
+        }
+      }, 100);
     };
     
-    applyInitialLayout();
+    loadFromBackend();
   }, []); // Only run once on mount
+
+  // Auto-save on changes
+  useEffect(() => {
+    if (nodes.length > 0 && edges.length >= 0) {
+      workflow.markAsChanged();
+      workflow.enableAutoSave(nodes, edges);
+    }
+  }, [nodes, edges, workflow]);
 
   // Quick layout function for the panel button
   const applyQuickLayout = async () => {
@@ -347,18 +373,166 @@ export default function WorkflowPage() {
           <Controls />
           <MiniMap />
           
-          {/* Quick Layout Panel */}
+          {/* Workflow Management Panel */}
           <Panel position="top-right" className="m-2">
-            <button
-              onClick={applyQuickLayout}
-              disabled={isLayouting || nodes.length === 0}
-              className="bg-white border border-gray-300 rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
-              title="Auto arrange nodes"
-            >
-              <LayoutGrid size={16} className={isLayouting ? 'animate-spin' : ''} />
-              {isLayouting ? 'Layouting...' : 'Auto Layout'}
-            </button>
+            <div className="flex flex-col gap-2">
+              {/* Workflow Status */}
+              <div className="bg-white border border-gray-300 rounded-md px-3 py-2 text-xs text-gray-600 shadow-sm">
+                {workflow.hasUnsavedChanges ? (
+                  <div className="flex items-center gap-1 text-orange-600">
+                    <AlertTriangle size={12} />
+                    Unsaved changes
+                  </div>
+                ) : workflow.lastSaved ? (
+                  <div className="text-green-600">
+                    Saved {workflow.lastSaved.toLocaleTimeString()}
+                  </div>
+                ) : (
+                  <div className="text-gray-500">No workflow loaded</div>
+                )}
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => workflow.save(nodes, edges)}
+                                     disabled={workflow.isSaving || (!workflow.hasUnsavedChanges && !!workflow.lastSaved)}
+                  size="sm"
+                  className="flex items-center gap-1"
+                  title="Save workflow"
+                >
+                  <Save size={14} />
+                  {workflow.isSaving ? 'Saving...' : 'Save'}
+                </Button>
+                
+                <Button
+                  onClick={() => workflow.load().then(data => {
+                    if (data) {
+                      setNodes(data.nodes);
+                      setEdges(data.edges);
+                    }
+                  })}
+                  disabled={workflow.isLoading}
+                  size="sm"
+                  variant="outline"
+                  className="flex items-center gap-1"
+                  title="Load workflow"
+                >
+                  <Download size={14} />
+                  {workflow.isLoading ? 'Loading...' : 'Load'}
+                </Button>
+                
+                <Button
+                  onClick={() => setShowExecutionPanel(!showExecutionPanel)}
+                  disabled={workflow.isExecuting || nodes.length === 0}
+                  size="sm"
+                  variant="outline"
+                  className="flex items-center gap-1"
+                  title="Execute workflow"
+                >
+                  <Play size={14} />
+                  Execute
+                </Button>
+              </div>
+              
+              {/* Auto Layout Button */}
+              <Button
+                onClick={applyQuickLayout}
+                disabled={isLayouting || nodes.length === 0}
+                size="sm"
+                variant="outline"
+                className="flex items-center gap-1"
+                title="Auto arrange nodes"
+              >
+                <LayoutGrid size={14} className={isLayouting ? 'animate-spin' : ''} />
+                {isLayouting ? 'Layouting...' : 'Auto Layout'}
+              </Button>
+            </div>
           </Panel>
+
+          {/* Execution Panel */}
+          {showExecutionPanel && (
+            <Panel position="top-center" className="m-2 w-96">
+              <div className="bg-white border border-gray-300 rounded-lg p-4 shadow-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-medium text-gray-900">Execute Workflow</h3>
+                  <button
+                    onClick={() => setShowExecutionPanel(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ×
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Input Message
+                    </label>
+                    <textarea
+                      value={executionInput}
+                      onChange={(e) => setExecutionInput(e.target.value)}
+                      placeholder="Enter your message to process through the workflow..."
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm resize-none"
+                      rows={3}
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={async () => {
+                        if (!executionInput.trim()) return;
+                        const result = await workflow.execute(executionInput);
+                        setExecutionResult(result);
+                        if (result) {
+                          setExecutionInput('');
+                        }
+                      }}
+                      disabled={workflow.isExecuting || !executionInput.trim()}
+                      size="sm"
+                      className="flex items-center gap-1"
+                    >
+                      <Play size={14} />
+                      {workflow.isExecuting ? 'Executing...' : 'Run'}
+                    </Button>
+                    
+                    <Button
+                      onClick={() => workflow.validate(nodes, edges)}
+                      disabled={workflow.isValidating}
+                      size="sm"
+                      variant="outline"
+                      className="flex items-center gap-1"
+                    >
+                      {workflow.isValidating ? 'Validating...' : 'Validate'}
+                    </Button>
+                  </div>
+                  
+                  {workflow.validationResult && (
+                    <div className="text-xs">
+                      {workflow.validationResult.is_valid ? (
+                        <div className="text-green-600">✓ Workflow is valid</div>
+                      ) : (
+                        <div className="text-red-600">
+                          ✗ {workflow.validationResult.errors.length} error(s) found
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {executionResult && (
+                    <div className="mt-3 p-2 bg-gray-50 rounded border text-xs">
+                      <div className="font-medium mb-1">Execution Result:</div>
+                      <div className="text-gray-600">
+                        Status: {executionResult.status}<br/>
+                        Messages: {executionResult.messages?.length || 0}<br/>
+                        Nodes: {executionResult.node_executions?.length || 0}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Panel>
+          )}
         </ReactFlow>
       </div>
       <Sidebar 

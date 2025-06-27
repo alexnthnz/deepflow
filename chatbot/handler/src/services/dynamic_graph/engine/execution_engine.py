@@ -23,9 +23,9 @@ class DynamicGraphExecutionEngine:
 
     def __init__(self, db_session: Session, max_retries: int = 3, timeout_seconds: int = 300):
         self.db = db_session
-        self.builder = DynamicGraphBuilder(db_session)
-        self.state_manager = DynamicStateManager()
         self.tracker = ExecutionTracker(db_session)
+        self.builder = DynamicGraphBuilder(db_session, self.tracker)
+        self.state_manager = DynamicStateManager()
         self.max_retries = max_retries
         self.timeout_seconds = timeout_seconds
 
@@ -77,12 +77,35 @@ class DynamicGraphExecutionEngine:
                         timeout=self.timeout_seconds
                     )
                     
-                    # 5. Record successful execution
+                    # 5. Save conversation history and get filtered messages (using static graph approach)
+                    context_messages = state.get("_context_messages", [])
+                    all_messages = result.get("messages", [])
+                    
+                    # Filter messages using the same logic as static graph
+                    # This filters out context messages but keeps new user input and AI responses
+                    filtered_messages = [
+                        message
+                        for message in all_messages
+                        if message not in context_messages
+                    ]
+                    
+                    # Save filtered messages to conversation history
+                    self.state_manager.save_conversation_history(state, filtered_messages)
+                    
+                    # For API response: return only AI and tool responses (exclude user input)
+                    filtered_messages_for_response = []
+                    for message in filtered_messages:
+                        msg_type = getattr(message, 'type', type(message).__name__)
+                        # Include only AI and tool messages, exclude human and system messages
+                        if msg_type not in ['human', 'system']:
+                            filtered_messages_for_response.append(message)
+                    
+                    # 6. Record successful execution
                     self.tracker.complete_execution(execution.id, "completed")
                     
                     return {
                         "execution_id": execution.id,
-                        "messages": result.get("messages", []),
+                        "messages": filtered_messages_for_response,  # Return only new AI/tool responses
                         "node_executions": self.tracker.get_node_executions(execution.id),
                         "status": "completed",
                         "attempts": attempt + 1,

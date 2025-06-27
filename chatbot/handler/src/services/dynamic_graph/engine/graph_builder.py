@@ -23,11 +23,11 @@ class DynamicGraphBuilder:
     Builds a LangGraph StateGraph from database configuration.
     """
 
-    def __init__(self, db_session: Session):
+    def __init__(self, db_session: Session, execution_tracker=None):
         self.db = db_session
         self.graph_repo = GraphRepository(db_session)
         self.config_manager = ConfigManager(db_session)
-        self.node_handlers = NodeHandlerRegistry(self.config_manager)
+        self.node_handlers = NodeHandlerRegistry(self.config_manager, execution_tracker)
         self.cache = GraphCache()
 
     def build_graph_from_database(self) -> StateGraph:
@@ -58,8 +58,16 @@ class DynamicGraphBuilder:
         workflow = StateGraph(DynamicState)
         node_id_map = {node.node_id: node for node in nodes}
 
-        # Add nodes
+        # Identify start nodes first to determine which nodes to skip
+        start_nodes = [node for node in nodes if node.node_type == "start"]
+        
+        # Add nodes (skip start nodes since we'll bypass them)
         for node in nodes:
+            # Skip start nodes - we'll create direct edge from START
+            if node.node_type == "start":
+                logger.debug(f"Skipping start node {node.node_id} - will use direct edge from START")
+                continue
+                
             handler = self.node_handlers.get_handler(node.node_type)
             if not handler:
                 logger.warning(
@@ -67,10 +75,18 @@ class DynamicGraphBuilder:
                 )
                 continue
             workflow.add_node(node.node_id, handler.create_handler(node))
+            logger.debug(f"Added node {node.node_id} of type {node.node_type}")
 
-        # Add edges
+        # Add edges (skip edges from start nodes since we handle them separately)
+        start_node_ids = {node.node_id for node in start_nodes}
+        
         for edge in edges:
             try:
+                # Skip edges from start nodes - we handle them with direct START edge
+                if edge.from_node_id in start_node_ids:
+                    logger.debug(f"Skipping edge from start node {edge.from_node_id} to {edge.to_node_id}")
+                    continue
+                
                 # For conditional edges, use add_conditional_edges
                 if edge.condition_type == "conditional":
                     # The handler for the from_node must return a key for the condition
@@ -117,19 +133,41 @@ class DynamicGraphBuilder:
                     )
                 else:
                     # Simple direct edge
-                    workflow.add_edge(edge.from_node_id, edge.to_node_id)
+                    # If target is an end node, connect to END instead
+                    target_node = edge.to_node_id
+                    target_node_obj = node_id_map.get(target_node)
+                    
+                    if target_node_obj and target_node_obj.node_type == "end":
+                        workflow.add_edge(edge.from_node_id, END)
+                        logger.debug(f"Added edge from {edge.from_node_id} to END (was {target_node})")
+                    else:
+                        workflow.add_edge(edge.from_node_id, edge.to_node_id)
+                        logger.debug(f"Added edge from {edge.from_node_id} to {edge.to_node_id}")
                     
             except Exception as e:
                 logger.error(f"Failed to add edge from {edge.from_node_id} to {edge.to_node_id}: {e}")
                 # Continue with other edges even if one fails
 
-        # Set entry point and handle start/end nodes
-        start_nodes = [node for node in nodes if node.node_type == "start"]
+        # Set entry point and handle start/end nodes  
         end_nodes = [node for node in nodes if node.node_type == "end"]
         
         if start_nodes:
-            # If we have start nodes, set the first one as entry point
-            workflow.set_entry_point(start_nodes[0].node_id)
+            # Follow the working static graph pattern: direct edge from START to next processing node
+            # Find the node that the start node connects to
+            start_node_id = start_nodes[0].node_id
+            next_node = None
+            for edge in edges:
+                if edge.from_node_id == start_node_id:
+                    next_node = edge.to_node_id
+                    break
+            
+            if next_node:
+                # Use direct edge from START to the actual processing node (like working example)
+                workflow.add_edge(START, next_node)
+                logger.debug(f"Added direct edge from START to {next_node} (bypassing start node)")
+            else:
+                logger.warning(f"Start node {start_node_id} has no outgoing edges")
+                workflow.set_entry_point(start_node_id)
         elif nodes:
             # If no start node, use the first node as entry point
             workflow.set_entry_point(nodes[0].node_id)

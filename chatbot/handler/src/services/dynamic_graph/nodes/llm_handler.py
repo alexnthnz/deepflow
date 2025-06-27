@@ -39,50 +39,49 @@ class LLMNodeHandler(BaseNodeHandler):
             Callable: Function that can be used as a LangGraph node
         """
 
-        def llm_handler(
-            state: DynamicState, runnable_config: RunnableConfig
-        ) -> Command:
+        def llm_handler(state: DynamicState, config: RunnableConfig) -> Command:
             try:
-                # Get node configuration
-                node_config = self.get_node_config(node)
-
                 # Log execution start
                 self.log_node_execution(
                     node.node_id,
                     "running",
-                    input_tokens=len(state.messages) if state.messages else 0,
+                    execution_id=state.get("execution_id"),
+                    input_tokens=len(state.get("messages", [])),
                 )
 
-                # Create LLM with custom configuration
-                llm = self._create_custom_llm(node_config)
+                # Create LLM with same configuration as working static graph
+                from config.config import config as app_config
+                model = ChatBedrockConverse(
+                    model=app_config.AWS_BEDROCK_MODEL_ID,
+                    temperature=0,
+                    max_tokens=None,
+                    region_name=app_config.AWS_REGION,
+                )
 
-                # Get tools for this node
-                tools = self.config_manager.get_node_tools(node)
-                if tools:
-                    model = llm.bind_tools(tools)
-                else:
-                    model = llm
-
-                # Prepare messages with system prompt
-                messages = self._prepare_messages(state.messages, node_config)
-
-                # Execute LLM
-                response = model.invoke(messages, runnable_config)
+                # Execute LLM with state messages directly
+                response = model.invoke(state["messages"], config)
 
                 # Log successful execution
                 self.log_node_execution(
                     node.node_id,
                     "completed",
-                    output_tokens=(
-                        len(response.content) if hasattr(response, "content") else 0
-                    ),
+                    execution_id=state.get("execution_id"),
+                    output_tokens=len(response.content) if hasattr(response, "content") else 0,
                 )
 
-                return Command(update={"messages": [response]})
+                # Append the response to existing messages
+                current_messages = state.get("messages", [])
+                new_messages = current_messages + [response]
+                return Command(update={"messages": new_messages})
 
             except Exception as e:
                 error_msg = f"LLM node execution failed: {str(e)}"
-                self.log_node_execution(node.node_id, "failed", error_message=error_msg)
+                self.log_node_execution(
+                    node.node_id, 
+                    "failed", 
+                    execution_id=state.get("execution_id"),
+                    error_message=error_msg
+                )
                 return self.create_error_command(error_msg)
 
         return llm_handler
@@ -142,14 +141,11 @@ class LLMNodeHandler(BaseNodeHandler):
         llm = ChatBedrockConverse(
             model=model_id,
             temperature=temperature,
-            max_tokens=max_tokens,
-            top_p=top_p,
-            frequency_penalty=frequency_penalty,
-            presence_penalty=presence_penalty,
+            max_tokens=max_tokens if max_tokens > 0 else None,
             region_name=config.AWS_REGION,
         )
 
-        logger.debug(f"Created LLM with config: model={model_id}, temp={temperature}")
+        logger.debug(f"Created LLM with model={model_id}, temp={temperature}")
         return llm
 
     def _prepare_messages(self, messages: List, node_config: Dict[str, Any]) -> List:

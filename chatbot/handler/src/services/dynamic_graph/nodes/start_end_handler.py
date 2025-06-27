@@ -39,34 +39,51 @@ class StartEndNodeHandler(BaseNodeHandler):
         def start_end_handler(state: DynamicState) -> Command:
             try:
                 node_type = node.node_type
+                
+                logger.info(f"Start/End Handler executing for node {node.node_id} (type: {node_type})")
+                logger.info(f"Current state messages: {len(state.get('messages', [])) if state.get('messages') else 0}")
 
                 # Log execution
-                self.log_node_execution(node.node_id, "running", node_type=node_type)
+                self.log_node_execution(
+                    node.node_id, "running", 
+                    execution_id=state.get("execution_id"),
+                    node_type=node_type
+                )
 
                 if node_type == "start":
                     # Start node - just pass through
                     self.log_node_execution(
-                        node.node_id, "completed", message="Start node executed"
+                        node.node_id, "completed", 
+                        execution_id=state.get("execution_id"),
+                        message="Start node executed"
                     )
                     return Command(update={})  # No state changes
 
                 elif node_type == "end":
                     # End node - mark as last step
                     self.log_node_execution(
-                        node.node_id, "completed", message="End node executed"
+                        node.node_id, "completed", 
+                        execution_id=state.get("execution_id"),
+                        message="End node executed"
                     )
                     return Command(update={"is_last_step": True})
 
                 else:
                     error_msg = f"Unknown node type: {node_type}"
                     self.log_node_execution(
-                        node.node_id, "failed", error_message=error_msg
+                        node.node_id, "failed", 
+                        execution_id=state.get("execution_id"),
+                        error_message=error_msg
                     )
                     return self.create_error_command(error_msg)
 
             except Exception as e:
                 error_msg = f"Start/End node execution failed: {str(e)}"
-                self.log_node_execution(node.node_id, "failed", error_message=error_msg)
+                self.log_node_execution(
+                    node.node_id, "failed", 
+                    execution_id=state.get("execution_id"),
+                    error_message=error_msg
+                )
                 return self.create_error_command(error_msg)
 
         return start_end_handler

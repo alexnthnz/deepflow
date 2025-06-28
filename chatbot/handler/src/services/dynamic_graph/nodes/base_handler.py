@@ -23,8 +23,9 @@ class BaseNodeHandler(ABC):
     in the dynamic graph system.
     """
 
-    def __init__(self, config_manager):
+    def __init__(self, config_manager, execution_tracker=None):
         self.config_manager = config_manager
+        self.execution_tracker = execution_tracker
 
     @abstractmethod
     def create_handler(self, node: GraphNode) -> Callable:
@@ -69,6 +70,7 @@ class BaseNodeHandler(ABC):
     ):
         """
         Log node execution for debugging and monitoring.
+        Also record execution in database if tracker is available.
 
         Args:
             node_id: Node identifier
@@ -83,6 +85,19 @@ class BaseNodeHandler(ABC):
             logger.error(f"Node execution failed: {log_data}")
         else:
             logger.info(f"Node execution: {log_data}")
+            
+        # Record in database if tracker is available and execution_id is provided
+        if self.execution_tracker and "execution_id" in kwargs:
+            try:
+                self.execution_tracker.record_node_execution(
+                    execution_id=kwargs["execution_id"],
+                    node_id=node_id,
+                    status=status,
+                    error_message=error_message,
+                    execution_metadata=kwargs
+                )
+            except Exception as e:
+                logger.error(f"Failed to record node execution in database: {e}")
 
     def create_command(self, **updates) -> Command:
         """

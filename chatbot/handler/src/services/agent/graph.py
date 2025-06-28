@@ -1,13 +1,16 @@
 import logging
 from typing import Optional, List, Tuple
+import json
 
 from langchain_core.messages import ToolMessage, HumanMessage, SystemMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
+from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_postgres import PostgresChatMessageHistory
 from langgraph.graph import StateGraph, END, START
 from langgraph.types import Command
 
 from database import database
+from config.redis_client import redis_client
 
 from .llm import llm
 from .tools import TOOLS
@@ -20,13 +23,42 @@ logger = logging.getLogger(__name__)
 class Graph:
     def __init__(self, session_id=None):
         self.thread_id = session_id
+        self._initialized = False  # Track initialization state
+        self.mcp_configs = self._get_cached_mcp_configs()
+        logger.info(f"Graph initialized with {len(self.mcp_configs)} MCP configurations")
 
+        # Defer async initialization (client and tools) to async initialize method
+        self.client = None
+        self.model = None
+        self.graph = None
+        self.conversation_history = None
+
+    async def initialize(self):
+        """Asynchronous initializer for setting up MCP client, tools, and graph."""
+        if self._initialized:
+            logger.debug("Graph already initialized, skipping")
+            return
+
+        # Initialize MCP client and fetch tools
+        self.client = MultiServerMCPClient(self.mcp_configs)
+        try:
+            mcp_tools = await self.client.get_tools()
+            logger.info(f"Retrieved {len(mcp_tools)} tools from MCP client")
+        except Exception as e:
+            logger.error(f"Failed to retrieve tools from MCP client: {e}")
+            raise
+
+        # Initialize conversation history
         self.conversation_history = PostgresChatMessageHistory(
             "chat_history",
-            session_id,
+            self.thread_id,
             sync_connection=database.sync_connection,
         )
-        self.model = llm.bind_tools(TOOLS)
+
+        # Bind tools to the model
+        self.model = llm.bind_tools(TOOLS + mcp_tools)
+
+        # Set up the workflow
         workflow = StateGraph(State)
         workflow.add_edge(START, "llm")
         workflow.add_node("llm", self.__call_model)
@@ -42,7 +74,47 @@ class Graph:
         workflow.add_edge("tools", "llm")
         self.graph = workflow.compile()
 
+        self._initialized = True
+        logger.info("Graph async initialization completed")
+
+    @staticmethod
+    def _get_cached_mcp_configs():
+        """Retrieve all cached MCP configurations from Redis in dictionary format."""
+        try:
+            keys = redis_client.keys("mcp_config:*")
+            configs = {}
+            for key in keys:
+                try:
+                    config_json = redis_client.get(key)
+                    if config_json:
+                        config_data = json.loads(config_json)
+                        server_name = config_data.get("name") or key.replace("mcp_config:", "")
+                        clean_config = {
+                            "transport": config_data.get("transport"),
+                        }
+                        if config_data.get("command"):
+                            clean_config["command"] = config_data["command"]
+                        if config_data.get("args"):
+                            clean_config["args"] = config_data["args"]
+                        if config_data.get("url"):
+                            clean_config["url"] = config_data["url"]
+                        if config_data.get("env"):
+                            clean_config["env"] = config_data["env"]
+                        if config_data.get("timeout_seconds") and config_data["timeout_seconds"] != 60:
+                            clean_config["timeout_seconds"] = config_data["timeout_seconds"]
+                        configs[server_name] = clean_config
+                except (json.JSONDecodeError, Exception) as e:
+                    logger.warning(f"Failed to parse cached config {key}: {e}")
+                    continue
+            logger.info(f"Retrieved {len(configs)} cached MCP configurations for Graph: {list(configs.keys())}")
+            return configs
+        except Exception as e:
+            logger.error(f"Failed to retrieve cached MCP configs from Redis: {e}")
+            return {}
+
     def __call_model(self, state: State, config: RunnableConfig):
+        if not self._initialized:
+            raise RuntimeError("Graph not initialized. Call initialize() first.")
         response = self.model.invoke(state["messages"], config)
         return Command(update={"messages": [response]})
 
@@ -56,7 +128,6 @@ class Graph:
             logger.debug(f"Tool call: {tool_name}, args: {tool_args}")
             try:
                 if tool_name == "tavily_search":
-                    # Ensure args is a dict with expected structure
                     if isinstance(tool_args, str):
                         tool_args = {"query": tool_args}
                     elif not isinstance(tool_args, dict):
@@ -67,6 +138,7 @@ class Graph:
                     tool_result = tools_by_name[tool_name].invoke(tool_args)
                 else:
                     tool_result = tools_by_name[tool_name].invoke(tool_args)
+                logger.info(f"Tool {tool_name} invoked successfully with result: {tool_result}")
                 formatted_result = format_tool_message(tool_call, tool_result)
                 outputs.append(
                     ToolMessage(
@@ -99,25 +171,15 @@ class Graph:
         return "continue"
 
     async def get_message(
-        self, question: str, attachments: Optional[List[dict]] = None
+            self, question: str, attachments: Optional[List[dict]] = None
     ) -> Tuple[str, List[str], List[str], str]:
         """
         Invoke the graph to process a question and return all new messages in a structured format.
-
-        Args:
-            question (str): The user's question or message.
-            attachments (Optional[List[dict]]): Optional attachments related to the question.
-
-        Returns:
-            Tuple[str, List[str], List[str], str]: A tuple containing:
-                - A structured string of all new messages.
-                - List of message IDs.
-                - List of tool call IDs.
-                - The conversation title.
         """
-        history_messages = self.conversation_history.get_messages()
+        if not self._initialized:
+            await self.initialize()  # Ensure initialization before processing
 
-        # Get the last 10 messages, or all if fewer than 10
+        history_messages = self.conversation_history.get_messages()
         last_10_messages = (
             history_messages[-10:] if len(history_messages) > 10 else history_messages
         )
@@ -154,10 +216,10 @@ class Graph:
         human_assistance_tool_call_id = None
         human_assistance_tool_args = None
         if (
-            last_message
-            and isinstance(last_message, AIMessage)
-            and hasattr(last_message, "tool_calls")
-            and last_message.tool_calls
+                last_message
+                and isinstance(last_message, AIMessage)
+                and hasattr(last_message, "tool_calls")
+                and last_message.tool_calls
         ):
             for tool_call in last_message.tool_calls:
                 if tool_call["name"] == "human_assistance":

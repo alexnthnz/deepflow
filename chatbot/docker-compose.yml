@@ -1,9 +1,8 @@
-name: llmtoolflow
+name: deepflow 
 
 services:
   db:
     image: postgres:latest
-    container_name: llmtoolflow-db
     ports:
       - "5432:5432"
     environment:
@@ -13,7 +12,31 @@ services:
 
   redis:
     image: redis/redis-stack:latest
-    container_name: llmtoolflow-redis
     ports:
       - "6379:6379"
       - "8001:8001"
+
+  handler:
+    build:
+      context: ./handler
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    env_file:
+      - handler/.env
+    depends_on:
+      - db
+      - redis
+    
+    # Mount source code for development (enables hot reload)
+    volumes:
+      - ./handler/src:/app/src
+      - ./handler/.env:/app/.env
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

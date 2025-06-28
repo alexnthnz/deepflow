@@ -22,4 +22,9 @@ export const ENDPOINTS = {
   WORKFLOW_EXECUTE: `/api/${API_VERSION}/graphs/execute`,
   WORKFLOW_TEMPLATES: `/api/${API_VERSION}/graphs/templates`,
   WORKFLOW_APPLY_TEMPLATE: (templateId: string) => `/api/${API_VERSION}/graphs/templates/${templateId}/apply`,
+
+  // MCP endpoints
+  MCP_SERVER_METADATA: `/api/${API_VERSION}/mcp/server/metadata`,
+  MCP_CACHED_CONFIGS: `/api/${API_VERSION}/mcp/cached-configs`,
+  MCP_DELETE_CONFIG: (serverName: string) => `/api/${API_VERSION}/mcp/cached-configs/${serverName}`,
 }; 

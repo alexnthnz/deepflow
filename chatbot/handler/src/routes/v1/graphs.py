@@ -10,6 +10,10 @@ from schemas.requests.graph import (
     GraphNodeUpdate,
     GraphEdgeCreate,
     GraphEdgeUpdate,
+    DynamicGraphExecutionRequest,
+    WorkflowSaveRequest,
+    WorkflowValidateRequest,
+    NodePosition,
 )
 from schemas.responses.common import CommonResponse
 from schemas.responses.graph import (
@@ -22,14 +26,6 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-# Request models for dynamic graph execution
-class DynamicGraphExecutionRequest(BaseModel):
-    chat_id: Optional[str] = None
-    session_id: str
-    message: str
-    graph_name: Optional[str] = "default"
 
 
 # Graph Overview Endpoint
@@ -446,7 +442,7 @@ async def delete_edge(
 # Bulk Operations for Workflow Management
 @router.post("/bulk/save", response_model=CommonResponse)
 async def save_workflow(
-    workflow_data: dict,
+    workflow_data: WorkflowSaveRequest,
     graph_repo: GraphRepository = Depends(get_graph_repository),
 ):
     """
@@ -454,8 +450,8 @@ async def save_workflow(
     Expected format: {"nodes": [...], "edges": [...]}
     """
     try:
-        nodes_data = workflow_data.get("nodes", [])
-        edges_data = workflow_data.get("edges", [])
+        nodes_data = workflow_data.nodes
+        edges_data = workflow_data.edges
         
         saved_nodes = []
         saved_edges = []
@@ -464,19 +460,16 @@ async def save_workflow(
         for node_data in nodes_data:
             # Convert ReactFlow format to backend format
             backend_node = GraphNodeCreate(
-                node_id=node_data["id"],
-                node_type=node_data["data"]["nodeType"],
-                name=node_data["data"]["name"],
-                description=node_data["data"].get("description"),
-                position=NodePosition(
-                    x=int(node_data["position"]["x"]),
-                    y=int(node_data["position"]["y"])
-                ),
-                configuration=node_data["data"]
+                node_id=node_data.id,
+                node_type=node_data.data["nodeType"],
+                name=node_data.data["name"],
+                description=node_data.data.get("description"),
+                position=node_data.position,
+                configuration=node_data.data
             )
             
             # Check if node exists, update or create
-            existing_node = graph_repo.get_node_by_node_id(node_data["id"])
+            existing_node = graph_repo.get_node_by_node_id(node_data.id)
             if existing_node:
                 updated_node = graph_repo.update_node(existing_node.id, GraphNodeUpdate(
                     name=backend_node.name,
@@ -492,11 +485,11 @@ async def save_workflow(
         # Save edges
         for edge_data in edges_data:
             backend_edge = GraphEdgeCreate(
-                from_node_id=edge_data["source"],
-                to_node_id=edge_data["target"],
-                condition_type=edge_data.get("condition_type", "always"),
-                condition_config=edge_data.get("condition_config", {}),
-                label=edge_data.get("label")
+                from_node_id=edge_data.source,
+                to_node_id=edge_data.target,
+                condition_type=edge_data.condition_type or "always",
+                condition_config=edge_data.condition_config or {},
+                label=edge_data.label
             )
             
             # For simplicity, always create new edges (delete old ones first)
@@ -624,15 +617,15 @@ async def get_workflow_for_reactflow(
 
 @router.post("/validate", response_model=CommonResponse)
 async def validate_workflow(
-    workflow_data: dict,
+    workflow_data: WorkflowValidateRequest,
     graph_repo: GraphRepository = Depends(get_graph_repository),
 ):
     """Validate workflow structure and configuration."""
     try:
         from services.dynamic_graph.engine.config_manager import ConfigManager
         
-        nodes_data = workflow_data.get("nodes", [])
-        edges_data = workflow_data.get("edges", [])
+        nodes_data = workflow_data.nodes
+        edges_data = workflow_data.edges
         
         errors = []
         warnings = []
@@ -642,23 +635,23 @@ async def validate_workflow(
             errors.append("Workflow must contain at least one node")
         
         # Check for start and end nodes
-        node_types = [node["data"]["nodeType"] for node in nodes_data]
+        node_types = [node.data["nodeType"] for node in nodes_data]
         if "start" not in node_types:
             warnings.append("Workflow should have a start node")
         if "end" not in node_types:
             warnings.append("Workflow should have an end node")
         
         # Validate node IDs are unique
-        node_ids = [node["id"] for node in nodes_data]
+        node_ids = [node.id for node in nodes_data]
         if len(node_ids) != len(set(node_ids)):
             errors.append("Node IDs must be unique")
         
         # Validate edge connections
         for edge in edges_data:
-            if edge["source"] not in node_ids:
-                errors.append(f"Edge references non-existent source node: {edge['source']}")
-            if edge["target"] not in node_ids:
-                errors.append(f"Edge references non-existent target node: {edge['target']}")
+            if edge.source not in node_ids:
+                errors.append(f"Edge references non-existent source node: {edge.source}")
+            if edge.target not in node_ids:
+                errors.append(f"Edge references non-existent target node: {edge.target}")
         
         is_valid = len(errors) == 0
         
@@ -694,16 +687,38 @@ async def execute_dynamic_graph(
     """
     Execute the dynamic graph workflow with the given input message.
     This endpoint builds the graph from the database and executes it.
+    Supports both new chat sessions and continuing existing conversations.
     """
     try:
+        # Handle new chat session (same logic as static graph)
+        if request.is_new_chat:
+            # Generate a new session ID for new chats
+            session_id = str(uuid.uuid4())
+        else:
+            # Use provided session_id for existing chats
+            session_id = request.session_id
+            if not session_id:
+                return JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content=CommonResponse(
+                        message="session_id is required when is_new_chat is False",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        data=None,
+                        error="Missing session_id for existing chat",
+                    ).model_dump(),
+                )
+        
         engine = DynamicGraphExecutionEngine(db)
         
         result = await engine.execute_graph(
             chat_id=request.chat_id,
-            session_id=request.session_id,
+            session_id=session_id,
             input_message=request.message,
             graph_name=request.graph_name or "default",
         )
+        
+        # Add session_id to the response data (like static graph)
+        result["session_id"] = session_id
         
         return CommonResponse(
             message="Graph executed successfully",

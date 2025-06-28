@@ -24,8 +24,9 @@ class NodeHandlerRegistry:
     handler classes.
     """
 
-    def __init__(self, config_manager):
+    def __init__(self, config_manager, execution_tracker=None):
         self.config_manager = config_manager
+        self.execution_tracker = execution_tracker
         self._handlers: Dict[str, Type[BaseNodeHandler]] = {}
         self._instances: Dict[str, BaseNodeHandler] = {}
 
@@ -74,7 +75,7 @@ class NodeHandlerRegistry:
 
         # Create and cache instance
         try:
-            handler_instance = handler_class(self.config_manager)
+            handler_instance = handler_class(self.config_manager, self.execution_tracker)
             self._instances[node_type] = handler_instance
             return handler_instance
         except Exception as e:

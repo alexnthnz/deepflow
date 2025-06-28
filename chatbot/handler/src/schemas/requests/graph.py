@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 import uuid
 from datetime import datetime
 
@@ -104,3 +104,58 @@ class NodeExecutionUpdate(BaseModel):
     execution_time_ms: Optional[int] = None
     tokens_used: Optional[int] = None
     cost_usd: Optional[int] = None
+
+
+class DynamicGraphExecutionRequest(BaseModel):
+    chat_id: Optional[str] = None
+    session_id: Optional[str] = None
+    is_new_chat: Optional[bool] = Field(default=False, description="Whether this is a new chat session")
+    message: str = Field(..., min_length=1)
+    graph_name: Optional[str] = Field(default="default", max_length=100)
+    
+    @field_validator('is_new_chat', 'session_id')
+    @classmethod
+    def validate_chat_params(cls, v, info):
+        """Validate is_new_chat and session_id parameters"""
+        if info.field_name == 'is_new_chat':
+            # Handle various boolean representations like the static graph
+            if v in [1, "1", "True", "true"]:
+                return True
+            elif v in [0, "0", "False", "false", None]:
+                return False
+            return v
+        return v
+    
+    @model_validator(mode='after')
+    def validate_session_requirements(self):
+        """Validate session_id requirements based on is_new_chat flag"""
+        if not self.is_new_chat and not self.session_id:
+            raise ValueError("session_id is required when is_new_chat is False")
+        return self
+
+
+class ReactFlowNode(BaseModel):
+    id: str = Field(..., min_length=1)
+    type: str = Field(..., min_length=1)
+    position: NodePosition
+    data: Dict[str, Any]
+
+
+class ReactFlowEdge(BaseModel):
+    id: Optional[str] = None
+    source: str = Field(..., min_length=1)
+    target: str = Field(..., min_length=1)
+    type: Optional[str] = None
+    condition_type: Optional[str] = None
+    condition_config: Optional[Dict[str, Any]] = None
+    label: Optional[str] = None
+
+
+class WorkflowSaveRequest(BaseModel):
+    nodes: List[ReactFlowNode] = Field(..., min_items=1)
+    edges: List[ReactFlowEdge] = Field(default_factory=list)
+
+
+class WorkflowValidateRequest(BaseModel):
+    nodes: List[ReactFlowNode] = Field(..., min_items=1)
+    edges: List[ReactFlowEdge] = Field(default_factory=list)

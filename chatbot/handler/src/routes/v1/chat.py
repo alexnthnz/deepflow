@@ -405,7 +405,7 @@ async def send_message(
         session_id = str(uuid.uuid4())
 
     agent = Graph(session_id=session_id)
-
+    await agent.initialize()
     try:
         # Process attachments if provided
         attachment_data = []

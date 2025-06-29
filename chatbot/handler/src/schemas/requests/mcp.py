@@ -6,7 +6,8 @@ class MCPServerMetadataRequest(BaseModel):
     """Request model for MCP server metadata."""
 
     name: Optional[str] = Field(
-        None, description="Unique name for this MCP server configuration (auto-generated if not provided)"
+        None,
+        description="Unique name for this MCP server configuration (auto-generated if not provided)",
     )
     transport: str = Field(
         ..., description="The type of MCP server connection (stdio or sse)"
@@ -23,4 +24,4 @@ class MCPServerMetadataRequest(BaseModel):
     env: Optional[Dict[str, str]] = Field(None, description="Environment variables")
     timeout_seconds: Optional[int] = Field(
         None, description="Optional custom timeout in seconds for the operation"
-    ) 
+    )

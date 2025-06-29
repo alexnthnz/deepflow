@@ -51,6 +51,7 @@ class LLMNodeHandler(BaseNodeHandler):
 
                 # Create LLM with same configuration as working static graph
                 from config.config import config as app_config
+
                 model = ChatBedrockConverse(
                     model=app_config.AWS_BEDROCK_MODEL_ID,
                     temperature=0,
@@ -66,7 +67,9 @@ class LLMNodeHandler(BaseNodeHandler):
                     node.node_id,
                     "completed",
                     execution_id=state.get("execution_id"),
-                    output_tokens=len(response.content) if hasattr(response, "content") else 0,
+                    output_tokens=(
+                        len(response.content) if hasattr(response, "content") else 0
+                    ),
                 )
 
                 # Append the response to existing messages
@@ -77,10 +80,10 @@ class LLMNodeHandler(BaseNodeHandler):
             except Exception as e:
                 error_msg = f"LLM node execution failed: {str(e)}"
                 self.log_node_execution(
-                    node.node_id, 
-                    "failed", 
+                    node.node_id,
+                    "failed",
                     execution_id=state.get("execution_id"),
-                    error_message=error_msg
+                    error_message=error_msg,
                 )
                 return self.create_error_command(error_msg)
 

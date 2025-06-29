@@ -21,6 +21,7 @@ def create_tavily_search(
     include_images: bool = False,
     time_range: Optional[Literal["day", "week", "month", "year"]] = None,
     search_depth: Literal["basic", "advanced"] = "basic",
+    max_results: int = 5,
 ) -> TavilySearch:
     """Creates and returns a new TavilySearch instance with configured parameters.
 
@@ -29,7 +30,7 @@ def create_tavily_search(
         include_images (bool): Whether to include image search results, defaults to False.
         time_range (Optional[Literal["day", "week", "month", "year"]]): Time range for search results, defaults to None (no restriction).
         search_depth (Literal["basic", "advanced"]): Depth of the search, defaults to "basic".
-
+        max_results (int): Maximum number of results to return, defaults to 4.
     Returns:
         TavilySearch: A configured TavilySearch instance.
 
@@ -42,8 +43,10 @@ def create_tavily_search(
         raise ValueError("Time range must be one of 'day', 'week', 'month', or 'year'")
     if search_depth not in ["basic", "advanced"]:
         raise ValueError("Search depth must be one of 'basic' or 'advanced'")
+    if not (1 <= max_results <= 10):
+        raise ValueError("Maximum results must be between 1 and 10")
     return TavilySearch(
-        max_results=5,
+        max_results=4 if include_images else max_results,
         topic=topic,
         include_images=include_images,
         search_depth=search_depth,
@@ -72,6 +75,12 @@ class TavilySearchInput(BaseModel):
     search_depth: Literal["basic", "advanced"] = Field(
         default="basic", description="Depth of the search"
     )
+    max_results: int = Field(
+        default=5,
+        ge=1,
+        le=10,
+        description="Maximum number of results to return (1-10), default is 5, images are limited to 4",
+    )
 
 
 # Define the tavily_search tool with a structured input schema
@@ -98,13 +107,14 @@ tavily_search_tool = StructuredTool.from_function(
     name="tavily_search",
     description="Provides curated, concise web results optimized for AI, ideal for quick, relevant answers or content "
     "generation. Supports topics: general, news, finance. Optionally includes image search results, "
-    "time range filtering (day, week, month, year), and search depth (basic, advanced).",
+    "time range filtering (day, week, month, year), and search depth (basic, advanced). Limit of 10 results without "
+    "images, 4 with images.",
     args_schema=TavilySearchInput,
 )
 
-TOOLS: List[Tool | BaseTool] = [
+static_tools: List[Tool | BaseTool] = [
     Tool(
-        name="google_search",
+        name="serper_search",
         func=search_1.results,
         description="Fetches raw, detailed Google search results (URLs, titles, snippets) for broad web data analysis "
         "or research.",

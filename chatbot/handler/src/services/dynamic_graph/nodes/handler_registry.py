@@ -75,7 +75,9 @@ class NodeHandlerRegistry:
 
         # Create and cache instance
         try:
-            handler_instance = handler_class(self.config_manager, self.execution_tracker)
+            handler_instance = handler_class(
+                self.config_manager, self.execution_tracker
+            )
             self._instances[node_type] = handler_instance
             return handler_instance
         except Exception as e:

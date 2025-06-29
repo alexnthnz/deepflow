@@ -21,7 +21,9 @@ class DynamicGraphExecutionEngine:
     Orchestrates execution of the dynamic graph, manages state, and tracks node executions.
     """
 
-    def __init__(self, db_session: Session, max_retries: int = 3, timeout_seconds: int = 300):
+    def __init__(
+        self, db_session: Session, max_retries: int = 3, timeout_seconds: int = 300
+    ):
         self.db = db_session
         self.tracker = ExecutionTracker(db_session)
         self.builder = DynamicGraphBuilder(db_session, self.tracker)
@@ -38,7 +40,7 @@ class DynamicGraphExecutionEngine:
     ) -> Dict[str, Any]:
         """
         Execute the dynamic graph workflow with enhanced error handling and retries.
-        
+
         Args:
             chat_id: Chat session ID
             session_id: Session ID
@@ -48,18 +50,20 @@ class DynamicGraphExecutionEngine:
             Dict[str, Any]: Execution result including messages and node executions
         """
         execution = None
-        
+
         for attempt in range(self.max_retries):
             try:
                 # 1. Start execution tracking
                 if execution is None:
                     execution = self.tracker.start_execution(chat_id, session_id)
-                
+
                 # 2. Build graph from database (with caching)
                 try:
                     graph = self.builder.build_graph_from_database()
                 except Exception as build_error:
-                    logger.error(f"Graph building failed on attempt {attempt + 1}: {build_error}")
+                    logger.error(
+                        f"Graph building failed on attempt {attempt + 1}: {build_error}"
+                    )
                     if attempt == self.max_retries - 1:
                         raise build_error
                     await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
@@ -73,14 +77,16 @@ class DynamicGraphExecutionEngine:
                 # 4. Execute graph with timeout and node tracking
                 try:
                     result = await asyncio.wait_for(
-                        self._execute_with_node_tracking(graph, state, execution.id, session_id),
-                        timeout=self.timeout_seconds
+                        self._execute_with_node_tracking(
+                            graph, state, execution.id, session_id
+                        ),
+                        timeout=self.timeout_seconds,
                     )
-                    
+
                     # 5. Save conversation history and get filtered messages (using static graph approach)
                     context_messages = state.get("_context_messages", [])
                     all_messages = result.get("messages", [])
-                    
+
                     # Filter messages using the same logic as static graph
                     # This filters out context messages but keeps new user input and AI responses
                     filtered_messages = [
@@ -88,29 +94,33 @@ class DynamicGraphExecutionEngine:
                         for message in all_messages
                         if message not in context_messages
                     ]
-                    
+
                     # Save filtered messages to conversation history
-                    self.state_manager.save_conversation_history(state, filtered_messages)
-                    
+                    self.state_manager.save_conversation_history(
+                        state, filtered_messages
+                    )
+
                     # For API response: return only AI and tool responses (exclude user input)
                     filtered_messages_for_response = []
                     for message in filtered_messages:
-                        msg_type = getattr(message, 'type', type(message).__name__)
+                        msg_type = getattr(message, "type", type(message).__name__)
                         # Include only AI and tool messages, exclude human and system messages
-                        if msg_type not in ['human', 'system']:
+                        if msg_type not in ["human", "system"]:
                             filtered_messages_for_response.append(message)
-                    
+
                     # 6. Record successful execution
                     self.tracker.complete_execution(execution.id, "completed")
-                    
+
                     return {
                         "execution_id": execution.id,
                         "messages": filtered_messages_for_response,  # Return only new AI/tool responses
-                        "node_executions": self.tracker.get_node_executions(execution.id),
+                        "node_executions": self.tracker.get_node_executions(
+                            execution.id
+                        ),
                         "status": "completed",
                         "attempts": attempt + 1,
                     }
-                    
+
                 except asyncio.TimeoutError:
                     error_msg = f"Graph execution timed out after {self.timeout_seconds} seconds"
                     logger.error(error_msg)
@@ -119,18 +129,22 @@ class DynamicGraphExecutionEngine:
                         return {
                             "execution_id": execution.id,
                             "messages": [],
-                            "node_executions": self.tracker.get_node_executions(execution.id),
+                            "node_executions": self.tracker.get_node_executions(
+                                execution.id
+                            ),
                             "status": "failed",
                             "error": error_msg,
                             "attempts": attempt + 1,
                         }
                     await asyncio.sleep(2 * (attempt + 1))  # Exponential backoff
                     continue
-                    
+
             except Exception as e:
-                error_msg = f"Dynamic graph execution failed on attempt {attempt + 1}: {str(e)}"
+                error_msg = (
+                    f"Dynamic graph execution failed on attempt {attempt + 1}: {str(e)}"
+                )
                 logger.error(error_msg, exc_info=True)
-                
+
                 if attempt == self.max_retries - 1:
                     # Final attempt failed
                     if execution:
@@ -138,15 +152,19 @@ class DynamicGraphExecutionEngine:
                     return {
                         "execution_id": execution.id if execution else None,
                         "messages": [],
-                        "node_executions": self.tracker.get_node_executions(execution.id) if execution else [],
+                        "node_executions": (
+                            self.tracker.get_node_executions(execution.id)
+                            if execution
+                            else []
+                        ),
                         "status": "failed",
                         "error": str(e),
                         "attempts": attempt + 1,
                     }
-                
+
                 # Wait before retry with exponential backoff
                 await asyncio.sleep(1 * (attempt + 1))
-        
+
         # Should not reach here, but safety fallback
         return {
             "execution_id": execution.id if execution else None,
@@ -175,15 +193,15 @@ class DynamicGraphExecutionEngine:
         try:
             # Execute the graph with proper configuration
             result = await graph.ainvoke(
-                state, 
+                state,
                 config={
                     "configurable": {"thread_id": session_id},
                     "recursion_limit": 100,  # Prevent infinite loops
-                }
+                },
             )
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"Graph execution failed: {e}", exc_info=True)
             raise
@@ -191,7 +209,7 @@ class DynamicGraphExecutionEngine:
     def validate_graph_before_execution(self) -> Dict[str, Any]:
         """
         Validate graph structure before execution.
-        
+
         Returns:
             Dict[str, Any]: Validation result with errors/warnings
         """
@@ -203,13 +221,13 @@ class DynamicGraphExecutionEngine:
                 "warnings": [],
                 "graph_info": {
                     "nodes_count": len(graph.nodes),
-                    "edges_count": len(graph.edges) if hasattr(graph, 'edges') else 0,
-                }
+                    "edges_count": len(graph.edges) if hasattr(graph, "edges") else 0,
+                },
             }
         except Exception as e:
             return {
                 "is_valid": False,
                 "errors": [str(e)],
                 "warnings": [],
-                "graph_info": None
+                "graph_info": None,
             }

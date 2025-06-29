@@ -109,15 +109,17 @@ class NodeExecutionUpdate(BaseModel):
 class DynamicGraphExecutionRequest(BaseModel):
     chat_id: Optional[str] = None
     session_id: Optional[str] = None
-    is_new_chat: Optional[bool] = Field(default=False, description="Whether this is a new chat session")
+    is_new_chat: Optional[bool] = Field(
+        default=False, description="Whether this is a new chat session"
+    )
     message: str = Field(..., min_length=1)
     graph_name: Optional[str] = Field(default="default", max_length=100)
-    
-    @field_validator('is_new_chat', 'session_id')
+
+    @field_validator("is_new_chat", "session_id")
     @classmethod
     def validate_chat_params(cls, v, info):
         """Validate is_new_chat and session_id parameters"""
-        if info.field_name == 'is_new_chat':
+        if info.field_name == "is_new_chat":
             # Handle various boolean representations like the static graph
             if v in [1, "1", "True", "true"]:
                 return True
@@ -125,8 +127,8 @@ class DynamicGraphExecutionRequest(BaseModel):
                 return False
             return v
         return v
-    
-    @model_validator(mode='after')
+
+    @model_validator(mode="after")
     def validate_session_requirements(self):
         """Validate session_id requirements based on is_new_chat flag"""
         if not self.is_new_chat and not self.session_id:

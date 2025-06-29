@@ -28,8 +28,6 @@ logger.setLevel(logging.INFO)  # Explicitly set to INFO
 # FastAPI app
 app = FastAPI(title="Handler Service")
 
-database.migrate_db()
-
 app.mount("/api/v1", api_v1)
 
 origins = ["*"]

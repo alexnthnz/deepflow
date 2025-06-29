@@ -35,16 +35,16 @@ async def _get_tools_from_client_session(
                 await session.initialize()
                 # List available tools
                 listed_tools = await session.list_tools()
-                
+
                 # Validate that tools were returned
-                if not hasattr(listed_tools, 'tools'):
+                if not hasattr(listed_tools, "tools"):
                     logger.warning("MCP server response missing 'tools' attribute")
                     return []
-                
+
                 tools = listed_tools.tools
                 logger.debug(f"Retrieved {len(tools)} tools from MCP server")
                 return tools
-                
+
     except Exception as e:
         logger.error(f"Error in MCP client session: {e}")
         raise
@@ -78,15 +78,12 @@ async def load_mcp_tools(
     # Input validation
     if not server_type or server_type not in ["stdio", "sse"]:
         raise HTTPException(
-            status_code=400, 
-            detail=f"Invalid server_type: {server_type}. Must be 'stdio' or 'sse'"
+            status_code=400,
+            detail=f"Invalid server_type: {server_type}. Must be 'stdio' or 'sse'",
         )
-    
+
     if timeout_seconds <= 0:
-        raise HTTPException(
-            status_code=400, 
-            detail="timeout_seconds must be positive"
-        )
+        raise HTTPException(status_code=400, detail="timeout_seconds must be positive")
 
     try:
         if server_type == "stdio":
@@ -95,7 +92,9 @@ async def load_mcp_tools(
                     status_code=400, detail="Command is required for stdio type"
                 )
 
-            logger.debug(f"Setting up stdio MCP server: command='{command}', args={args}")
+            logger.debug(
+                f"Setting up stdio MCP server: command='{command}', args={args}"
+            )
             server_params = StdioServerParameters(
                 command=command,  # Executable
                 args=args or [],  # Optional command line arguments (ensure it's a list)
@@ -132,16 +131,14 @@ async def load_mcp_tools(
         error_msg = str(e)
         if "timeout" in error_msg.lower():
             raise HTTPException(
-                status_code=504, 
-                detail=f"Timeout connecting to MCP server: {error_msg}"
+                status_code=504, detail=f"Timeout connecting to MCP server: {error_msg}"
             )
         elif "connection" in error_msg.lower():
             raise HTTPException(
-                status_code=503, 
-                detail=f"Connection error to MCP server: {error_msg}"
+                status_code=503, detail=f"Connection error to MCP server: {error_msg}"
             )
         else:
             raise HTTPException(
-                status_code=500, 
-                detail=f"Failed to load tools from MCP server: {error_msg}"
-            ) 
+                status_code=500,
+                detail=f"Failed to load tools from MCP server: {error_msg}",
+            )

@@ -452,10 +452,10 @@ async def save_workflow(
     try:
         nodes_data = workflow_data.nodes
         edges_data = workflow_data.edges
-        
+
         saved_nodes = []
         saved_edges = []
-        
+
         # Save nodes
         for node_data in nodes_data:
             # Convert ReactFlow format to backend format
@@ -465,23 +465,26 @@ async def save_workflow(
                 name=node_data.data["name"],
                 description=node_data.data.get("description"),
                 position=node_data.position,
-                configuration=node_data.data
+                configuration=node_data.data,
             )
-            
+
             # Check if node exists, update or create
             existing_node = graph_repo.get_node_by_node_id(node_data.id)
             if existing_node:
-                updated_node = graph_repo.update_node(existing_node.id, GraphNodeUpdate(
-                    name=backend_node.name,
-                    description=backend_node.description,
-                    position=backend_node.position,
-                    configuration=backend_node.configuration
-                ))
+                updated_node = graph_repo.update_node(
+                    existing_node.id,
+                    GraphNodeUpdate(
+                        name=backend_node.name,
+                        description=backend_node.description,
+                        position=backend_node.position,
+                        configuration=backend_node.configuration,
+                    ),
+                )
                 saved_nodes.append(updated_node)
             else:
                 created_node = graph_repo.create_node(backend_node)
                 saved_nodes.append(created_node)
-        
+
         # Save edges
         for edge_data in edges_data:
             backend_edge = GraphEdgeCreate(
@@ -489,19 +492,24 @@ async def save_workflow(
                 to_node_id=edge_data.target,
                 condition_type=edge_data.condition_type or "always",
                 condition_config=edge_data.condition_config or {},
-                label=edge_data.label
+                label=edge_data.label,
             )
-            
+
             # For simplicity, always create new edges (delete old ones first)
             created_edge = graph_repo.create_edge(backend_edge)
             saved_edges.append(created_edge)
-        
+
         return CommonResponse(
             message="Workflow saved successfully",
             status_code=status.HTTP_200_OK,
             data={
-                "nodes": [GraphNodeDetailInDB.model_validate(n).model_dump() for n in saved_nodes],
-                "edges": [GraphEdgeInDB.model_validate(e).model_dump() for e in saved_edges],
+                "nodes": [
+                    GraphNodeDetailInDB.model_validate(n).model_dump()
+                    for n in saved_nodes
+                ],
+                "edges": [
+                    GraphEdgeInDB.model_validate(e).model_dump() for e in saved_edges
+                ],
             },
             error=None,
         )
@@ -528,12 +536,12 @@ async def clear_workflow(
         edges = graph_repo.get_all_edges()
         for edge in edges:
             graph_repo.delete_edge(edge.id)
-        
+
         # Delete all nodes
         nodes = graph_repo.get_all_nodes()
         for node in nodes:
             graph_repo.delete_node(node.id)
-        
+
         return CommonResponse(
             message="Workflow cleared successfully",
             status_code=status.HTTP_204_NO_CONTENT,
@@ -561,45 +569,46 @@ async def get_workflow_for_reactflow(
     try:
         nodes = graph_repo.get_all_nodes()
         edges = graph_repo.get_all_edges()
-        
+
         # Convert to ReactFlow format
         reactflow_nodes = []
         for node in nodes:
-            reactflow_nodes.append({
-                "id": node.node_id,
-                "type": "custom",
-                "position": {"x": node.position_x, "y": node.position_y},
-                "data": {
-                    "name": node.name,
-                    "description": node.description,
-                    "nodeType": node.node_type,
-                    **node.configuration  # Spread configuration
+            reactflow_nodes.append(
+                {
+                    "id": node.node_id,
+                    "type": "custom",
+                    "position": {"x": node.position_x, "y": node.position_y},
+                    "data": {
+                        "name": node.name,
+                        "description": node.description,
+                        "nodeType": node.node_type,
+                        **node.configuration,  # Spread configuration
+                    },
                 }
-            })
-        
+            )
+
         reactflow_edges = []
         for edge in edges:
-            reactflow_edges.append({
-                "id": f"e-{edge.from_node_id}-{edge.to_node_id}",
-                "source": edge.from_node_id,
-                "target": edge.to_node_id,
-                "sourceHandle": "output",
-                "targetHandle": "input",
-                "type": "smoothstep",
-                "animated": True,
-                "style": {"stroke": "#6b7280", "strokeWidth": 1},
-                "label": edge.label,
-                "condition_type": edge.condition_type,
-                "condition_config": edge.condition_config
-            })
-        
+            reactflow_edges.append(
+                {
+                    "id": f"e-{edge.from_node_id}-{edge.to_node_id}",
+                    "source": edge.from_node_id,
+                    "target": edge.to_node_id,
+                    "sourceHandle": "output",
+                    "targetHandle": "input",
+                    "type": "smoothstep",
+                    "animated": True,
+                    "style": {"stroke": "#6b7280", "strokeWidth": 1},
+                    "label": edge.label,
+                    "condition_type": edge.condition_type,
+                    "condition_config": edge.condition_config,
+                }
+            )
+
         return CommonResponse(
             message="Workflow retrieved successfully",
             status_code=status.HTTP_200_OK,
-            data={
-                "nodes": reactflow_nodes,
-                "edges": reactflow_edges
-            },
+            data={"nodes": reactflow_nodes, "edges": reactflow_edges},
             error=None,
         )
     except Exception as e:
@@ -623,46 +632,46 @@ async def validate_workflow(
     """Validate workflow structure and configuration."""
     try:
         from services.dynamic_graph.engine.config_manager import ConfigManager
-        
+
         nodes_data = workflow_data.nodes
         edges_data = workflow_data.edges
-        
+
         errors = []
         warnings = []
-        
+
         # Basic validation
         if not nodes_data:
             errors.append("Workflow must contain at least one node")
-        
+
         # Check for start and end nodes
         node_types = [node.data["nodeType"] for node in nodes_data]
         if "start" not in node_types:
             warnings.append("Workflow should have a start node")
         if "end" not in node_types:
             warnings.append("Workflow should have an end node")
-        
+
         # Validate node IDs are unique
         node_ids = [node.id for node in nodes_data]
         if len(node_ids) != len(set(node_ids)):
             errors.append("Node IDs must be unique")
-        
+
         # Validate edge connections
         for edge in edges_data:
             if edge.source not in node_ids:
-                errors.append(f"Edge references non-existent source node: {edge.source}")
+                errors.append(
+                    f"Edge references non-existent source node: {edge.source}"
+                )
             if edge.target not in node_ids:
-                errors.append(f"Edge references non-existent target node: {edge.target}")
-        
+                errors.append(
+                    f"Edge references non-existent target node: {edge.target}"
+                )
+
         is_valid = len(errors) == 0
-        
+
         return CommonResponse(
             message="Workflow validation completed",
             status_code=status.HTTP_200_OK,
-            data={
-                "is_valid": is_valid,
-                "errors": errors,
-                "warnings": warnings
-            },
+            data={"is_valid": is_valid, "errors": errors, "warnings": warnings},
             error=None,
         )
     except Exception as e:
@@ -707,26 +716,26 @@ async def execute_dynamic_graph(
                         error="Missing session_id for existing chat",
                     ).model_dump(),
                 )
-        
+
         engine = DynamicGraphExecutionEngine(db)
-        
+
         result = await engine.execute_graph(
             chat_id=request.chat_id,
             session_id=session_id,
             input_message=request.message,
             graph_name=request.graph_name or "default",
         )
-        
+
         # Add session_id to the response data (like static graph)
         result["session_id"] = session_id
-        
+
         return CommonResponse(
             message="Graph executed successfully",
             status_code=status.HTTP_200_OK,
             data=result,
             error=None,
         )
-        
+
     except Exception as e:
         logger.error(f"Dynamic graph execution failed: {e}")
         return JSONResponse(
@@ -758,11 +767,11 @@ async def get_workflow_templates():
                         "data": {
                             "name": "Start",
                             "description": "Workflow entry point",
-                            "nodeType": "start"
-                        }
+                            "nodeType": "start",
+                        },
                     },
                     {
-                        "id": "llm-1", 
+                        "id": "llm-1",
                         "type": "custom",
                         "position": {"x": 300, "y": 100},
                         "data": {
@@ -770,34 +779,34 @@ async def get_workflow_templates():
                             "description": "Main chat processing",
                             "nodeType": "llm",
                             "system_prompt": "You are a helpful assistant.",
-                            "temperature": 0.7
-                        }
+                            "temperature": 0.7,
+                        },
                     },
                     {
                         "id": "end-1",
-                        "type": "custom", 
+                        "type": "custom",
                         "position": {"x": 500, "y": 100},
                         "data": {
                             "name": "End",
                             "description": "Workflow completion",
-                            "nodeType": "end"
-                        }
-                    }
+                            "nodeType": "end",
+                        },
+                    },
                 ],
                 "edges": [
                     {
                         "id": "e-start-1-llm-1",
                         "source": "start-1",
                         "target": "llm-1",
-                        "type": "smoothstep"
+                        "type": "smoothstep",
                     },
                     {
-                        "id": "e-llm-1-end-1", 
+                        "id": "e-llm-1-end-1",
                         "source": "llm-1",
                         "target": "end-1",
-                        "type": "smoothstep"
-                    }
-                ]
+                        "type": "smoothstep",
+                    },
+                ],
             },
             {
                 "id": "tool-workflow",
@@ -811,30 +820,30 @@ async def get_workflow_templates():
                         "data": {
                             "name": "Start",
                             "description": "Workflow entry point",
-                            "nodeType": "start"
-                        }
+                            "nodeType": "start",
+                        },
                     },
                     {
                         "id": "llm-1",
-                        "type": "custom", 
+                        "type": "custom",
                         "position": {"x": 300, "y": 150},
                         "data": {
                             "name": "Reasoning LLM",
                             "description": "Initial analysis and tool selection",
                             "nodeType": "llm",
                             "system_prompt": "You are an AI assistant with access to tools. Analyze the user's request and decide if you need to use tools.",
-                            "temperature": 0.3
-                        }
+                            "temperature": 0.3,
+                        },
                     },
                     {
                         "id": "condition-1",
                         "type": "custom",
-                        "position": {"x": 500, "y": 150}, 
+                        "position": {"x": 500, "y": 150},
                         "data": {
                             "name": "Tool Decision",
                             "description": "Decide whether to use tools",
-                            "nodeType": "condition"
-                        }
+                            "nodeType": "condition",
+                        },
                     },
                     {
                         "id": "tool-1",
@@ -842,9 +851,9 @@ async def get_workflow_templates():
                         "position": {"x": 600, "y": 50},
                         "data": {
                             "name": "Search Tool",
-                            "description": "Web search capability", 
-                            "nodeType": "tool"
-                        }
+                            "description": "Web search capability",
+                            "nodeType": "tool",
+                        },
                     },
                     {
                         "id": "llm-2",
@@ -855,8 +864,8 @@ async def get_workflow_templates():
                             "description": "Generate final response",
                             "nodeType": "llm",
                             "system_prompt": "Provide a helpful response based on the conversation and any tool results.",
-                            "temperature": 0.7
-                        }
+                            "temperature": 0.7,
+                        },
                     },
                     {
                         "id": "end-1",
@@ -865,22 +874,22 @@ async def get_workflow_templates():
                         "data": {
                             "name": "End",
                             "description": "Workflow completion",
-                            "nodeType": "end"
-                        }
-                    }
+                            "nodeType": "end",
+                        },
+                    },
                 ],
                 "edges": [
                     {
                         "id": "e-start-1-llm-1",
                         "source": "start-1",
                         "target": "llm-1",
-                        "type": "smoothstep"
+                        "type": "smoothstep",
                     },
                     {
                         "id": "e-llm-1-condition-1",
-                        "source": "llm-1", 
+                        "source": "llm-1",
                         "target": "condition-1",
-                        "type": "smoothstep"
+                        "type": "smoothstep",
                     },
                     {
                         "id": "e-condition-1-tool-1",
@@ -890,31 +899,31 @@ async def get_workflow_templates():
                         "condition_type": "conditional",
                         "condition_config": {
                             "conditions": {"use_tool": "tool-1"},
-                            "default": "llm-2"
-                        }
+                            "default": "llm-2",
+                        },
                     },
                     {
                         "id": "e-condition-1-llm-2",
                         "source": "condition-1",
-                        "target": "llm-2", 
-                        "type": "smoothstep"
+                        "target": "llm-2",
+                        "type": "smoothstep",
                     },
                     {
                         "id": "e-tool-1-llm-2",
                         "source": "tool-1",
                         "target": "llm-2",
-                        "type": "smoothstep"
+                        "type": "smoothstep",
                     },
                     {
                         "id": "e-llm-2-end-1",
                         "source": "llm-2",
                         "target": "end-1",
-                        "type": "smoothstep"
-                    }
-                ]
-            }
+                        "type": "smoothstep",
+                    },
+                ],
+            },
         ]
-        
+
         return CommonResponse(
             message="Workflow templates retrieved successfully",
             status_code=status.HTTP_200_OK,
@@ -945,13 +954,13 @@ async def apply_workflow_template(
         templates_response = await get_workflow_templates()
         if not templates_response.data:
             raise ValueError("No templates available")
-        
+
         template = None
         for t in templates_response.data:
             if t["id"] == template_id:
                 template = t
                 break
-        
+
         if not template:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -962,20 +971,20 @@ async def apply_workflow_template(
                     error=f"Template {template_id} does not exist",
                 ).model_dump(),
             )
-        
+
         # Clear existing workflow first
         existing_edges = graph_repo.get_all_edges()
         for edge in existing_edges:
             graph_repo.delete_edge(edge.id)
-        
+
         existing_nodes = graph_repo.get_all_nodes()
         for node in existing_nodes:
             graph_repo.delete_node(node.id)
-        
+
         # Apply template
         saved_nodes = []
         saved_edges = []
-        
+
         # Create nodes from template
         for node_data in template["nodes"]:
             backend_node = GraphNodeCreate(
@@ -984,14 +993,13 @@ async def apply_workflow_template(
                 name=node_data["data"]["name"],
                 description=node_data["data"].get("description"),
                 position=NodePosition(
-                    x=int(node_data["position"]["x"]),
-                    y=int(node_data["position"]["y"])
+                    x=int(node_data["position"]["x"]), y=int(node_data["position"]["y"])
                 ),
-                configuration=node_data["data"]
+                configuration=node_data["data"],
             )
             created_node = graph_repo.create_node(backend_node)
             saved_nodes.append(created_node)
-        
+
         # Create edges from template
         for edge_data in template["edges"]:
             backend_edge = GraphEdgeCreate(
@@ -999,22 +1007,27 @@ async def apply_workflow_template(
                 to_node_id=edge_data["target"],
                 condition_type=edge_data.get("condition_type", "always"),
                 condition_config=edge_data.get("condition_config", {}),
-                label=edge_data.get("label")
+                label=edge_data.get("label"),
             )
             created_edge = graph_repo.create_edge(backend_edge)
             saved_edges.append(created_edge)
-        
+
         return CommonResponse(
             message=f"Template '{template['name']}' applied successfully",
             status_code=status.HTTP_200_OK,
             data={
                 "template": template,
-                "nodes": [GraphNodeDetailInDB.model_validate(n).model_dump() for n in saved_nodes],
-                "edges": [GraphEdgeInDB.model_validate(e).model_dump() for e in saved_edges],
+                "nodes": [
+                    GraphNodeDetailInDB.model_validate(n).model_dump()
+                    for n in saved_nodes
+                ],
+                "edges": [
+                    GraphEdgeInDB.model_validate(e).model_dump() for e in saved_edges
+                ],
             },
             error=None,
         )
-        
+
     except Exception as e:
         logger.error(f"Error applying template: {e}")
         return JSONResponse(

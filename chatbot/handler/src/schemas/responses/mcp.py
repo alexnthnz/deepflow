@@ -20,4 +20,4 @@ class MCPServerMetadataResponse(BaseModel):
     env: Optional[Dict[str, str]] = Field(None, description="Environment variables")
     tools: List = Field(
         default_factory=list, description="Available tools from the MCP server"
-    ) 
+    )

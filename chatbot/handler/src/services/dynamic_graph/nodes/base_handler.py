@@ -85,7 +85,7 @@ class BaseNodeHandler(ABC):
             logger.error(f"Node execution failed: {log_data}")
         else:
             logger.info(f"Node execution: {log_data}")
-            
+
         # Record in database if tracker is available and execution_id is provided
         if self.execution_tracker and "execution_id" in kwargs:
             try:
@@ -94,7 +94,7 @@ class BaseNodeHandler(ABC):
                     node_id=node_id,
                     status=status,
                     error_message=error_message,
-                    execution_metadata=kwargs
+                    execution_metadata=kwargs,
                 )
             except Exception as e:
                 logger.error(f"Failed to record node execution in database: {e}")
